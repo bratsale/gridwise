@@ -2,14 +2,14 @@ namespace GridWise.Pricing.Tests;
 
 public class PriceCalculatorTests
 {
-    private static readonly PricingPlan Standard = new("Standard",
+    internal static readonly PricingPlan Standard = new("Standard",
         [new(100m, 0.10m), new(300m, 0.08m), new(500m, 0.07m), new(null, 0.06m)], 0.05m);
 
-    private static readonly PricingPlan Premium = new("Premium",
+    internal static readonly PricingPlan Premium = new("Premium",
         [new(200m, 0.09m), new(400m, 0.07m), new(600m, 0.05m), new(null, 0.04m)], 0.10m);
 
-    private static readonly TaxGroup Household = new(0.17m, 0.005m);
-    private static readonly TaxGroup Business = new(0.20m, 0.010m);
+    internal static readonly TaxGroup Household = new(0.17m, 0.005m);
+    internal static readonly TaxGroup Business = new(0.20m, 0.010m);
 
     [Fact]
     public void Premium_250_household_full_breakdown()
