@@ -15,19 +15,27 @@ public static class EnergyCost
 
         foreach (var tier in tiers)
         {
-            // Width of this tier; the last tier (no upper limit) takes everything left
-            decimal width = tier.UpTo is null ? remaining : tier.UpTo.Value - previousLimit;
-            decimal taken = Math.Min(remaining, width);
+            if (tier.UpTo is not decimal limit)
+            {
+                // The last tier (no upper limit) takes everything left
+                charges.Add(Charge(remaining, tier));
+                return charges;
+            }
 
-            charges.Add(new TierCharge(taken, tier.PricePerKwh, Money.Round(taken * tier.PricePerKwh)));
+            decimal taken = Math.Min(remaining, limit - previousLimit);
+
+            charges.Add(Charge(taken, tier));
             remaining -= taken;
 
             if (remaining == 0m)
                 return charges;
 
-            previousLimit = tier.UpTo.Value;
+            previousLimit = limit;
         }
 
         throw new InvalidOperationException("The last tier must have no upper limit.");
     }
+
+    private static TierCharge Charge(decimal kwh, PricingTier tier)
+        => new(kwh, tier.PricePerKwh, Money.Round(kwh * tier.PricePerKwh));
 }
