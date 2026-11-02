@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/GridWise.Catalog/GridWise.Catalog.csproj" />
     <Project Path="src/GridWise.Pricing/GridWise.Pricing.csproj" />
   </Folder>
   <Folder Name="/tests/">
