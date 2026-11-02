@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GridWise.Catalog.Migrations
 {
     [DbContext(typeof(CatalogDbContext))]
-    [Migration("20261102194615_InitialCatalog")]
+    [Migration("20261102200048_InitialCatalog")]
     partial class InitialCatalog
     {
         /// <inheritdoc />
@@ -277,7 +277,7 @@ namespace GridWise.Catalog.Migrations
                     b.HasOne("GridWise.Catalog.Domain.PlanVersion", null)
                         .WithMany("Tiers")
                         .HasForeignKey("PlanId", "VersionNo")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_plan_tiers_plan_versions_plan_id_version_no");
                 });
@@ -287,7 +287,7 @@ namespace GridWise.Catalog.Migrations
                     b.HasOne("GridWise.Catalog.Domain.Plan", null)
                         .WithMany("Versions")
                         .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_plan_versions_plans_plan_id");
                 });
@@ -297,7 +297,7 @@ namespace GridWise.Catalog.Migrations
                     b.HasOne("GridWise.Catalog.Domain.TaxGroup", null)
                         .WithMany("Versions")
                         .HasForeignKey("Code")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tax_group_versions_tax_groups_code");
                 });

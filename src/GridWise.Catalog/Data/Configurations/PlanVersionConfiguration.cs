@@ -19,6 +19,7 @@ public class PlanVersionConfiguration : IEntityTypeConfiguration<PlanVersion>
 
         builder.HasOne<Plan>()
             .WithMany(p => p.Versions)
-            .HasForeignKey(v => v.PlanId);
+            .HasForeignKey(v => v.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

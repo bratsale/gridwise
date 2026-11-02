@@ -91,7 +91,7 @@ namespace GridWise.Catalog.Migrations
                         column: x => x.plan_id,
                         principalTable: "plans",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -116,7 +116,7 @@ namespace GridWise.Catalog.Migrations
                         column: x => x.code,
                         principalTable: "tax_groups",
                         principalColumn: "code",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -138,7 +138,7 @@ namespace GridWise.Catalog.Migrations
                         columns: x => new { x.plan_id, x.version_no },
                         principalTable: "plan_versions",
                         principalColumns: new[] { "plan_id", "version_no" },
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(

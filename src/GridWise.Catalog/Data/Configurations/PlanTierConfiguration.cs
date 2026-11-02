@@ -19,6 +19,6 @@ public class PlanTierConfiguration : IEntityTypeConfiguration<PlanTier>
         builder.HasOne<PlanVersion>()
             .WithMany(v => v.Tiers)
             .HasForeignKey(t => new { t.PlanId, t.VersionNo })
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

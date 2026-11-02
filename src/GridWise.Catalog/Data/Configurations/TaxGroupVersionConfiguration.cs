@@ -23,6 +23,7 @@ public class TaxGroupVersionConfiguration : IEntityTypeConfiguration<TaxGroupVer
 
         builder.HasOne<TaxGroup>()
             .WithMany(g => g.Versions)
-            .HasForeignKey(v => v.Code);
+            .HasForeignKey(v => v.Code)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
