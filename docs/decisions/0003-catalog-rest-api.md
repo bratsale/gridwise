@@ -45,3 +45,9 @@ jednostavniji za klijenta. Odbačeno.
 - Ponovljena izmjena ili povlačenje (isti If-Match) daje 409, ne isti odgovor; klijent mora ponovo učitati stanje.
 - Tabela idempotency_keys traži čišćenje.
 - Ključ stariji od 24 h više ne štiti od duplikata.
+
+## Stil API-ja i validacija
+
+- API je pisan kao Minimal API. Svaki resurs ima svoj fajl sa metodom koja registruje rute (npr. MapPlanEndpoints); Program.cs ih samo poziva. Endpoint je tanak: čita zaglavlja, poziva servis, mapira rezultat na HTTP kod. Logika je u servisu.
+- Validacija ima dva nivoa. Oblik zahtjeva (obavezna polja, opsezi) provjerava framework preko DataAnnotations. Poslovna pravila (razredi rastu, tačno jedan razred bez granice i to poslednji, effective_from nije prije prethodne verzije) su u jednoj metodi domena, sa jediničnim testovima, nezavisno od HTTP-a.
+- Alternativa: kontroleri. Poznatiji i inače praktičniji obrazac, ali za servise sa desetak endpointa ne donose ništa što Minimal API nema, a oslanjaju se na više konvencija, plus, htio sam da probam nešto novo :). Odbačeno.
