@@ -16,6 +16,14 @@ public abstract record CreatePlanResult
     public sealed record KeyReusedWithDifferentBody : CreatePlanResult;
 }
 
+public abstract record ChangePlanResult
+{
+    public sealed record Created(PlanResponse Plan) : ChangePlanResult;
+    public sealed record NotFound : ChangePlanResult;
+    public sealed record Conflict(string Reason) : ChangePlanResult;
+    public sealed record ValidationFailed(Dictionary<string, string[]> Errors) : ChangePlanResult;
+}
+
 public class PlanService(CatalogDbContext db, TimeProvider time)
 {
     private const string Endpoint = "POST /plans";
@@ -45,48 +53,11 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             return new CreatePlanResult.ValidationFailed(errors);
 
         var planId = Guid.CreateVersion7();
-        var response = new PlanResponse(
-            planId, 1, req.Name, req.Discount, nameof(VersionStatus.Active), effectiveFrom, tiers);
+
+        db.Plans.Add(new Plan { Id = planId, CreatedAt = now });
+        var response = AddVersion(
+            planId, 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, now);
         var responseJson = JsonSerializer.Serialize(response, Json);
-
-        db.Plans.Add(new Plan
-        {
-            Id = planId,
-            CreatedAt = now,
-            Versions =
-            [
-                new PlanVersion
-                {
-                    PlanId = planId,
-                    VersionNo = 1,
-                    Name = req.Name,
-                    Discount = req.Discount,
-                    Status = VersionStatus.Active,
-                    EffectiveFrom = effectiveFrom,
-                    CreatedAt = now,
-                    Tiers = tiers.Select((t, i) => new PlanTier
-                    {
-                        PlanId = planId,
-                        VersionNo = 1,
-                        TierNo = i + 1,
-                        Threshold = t.Threshold,
-                        PricePerKwh = t.PricePerKwh
-                    }).ToList()
-                }
-            ]
-        });
-
-        db.OutboxMessages.Add(new OutboxMessage
-        {
-            Id = Guid.CreateVersion7(),
-            AggregateType = "plan",
-            AggregateId = planId.ToString(),
-            EventType = "PlanVersionCreated",
-            EventVersion = 1,
-            Payload = responseJson,
-            CorrelationId = correlationId,
-            OccurredAt = now
-        });
 
         db.IdempotencyKeys.Add(new IdempotencyKey
         {
@@ -114,6 +85,129 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
         }
 
         return new CreatePlanResult.Created(response);
+    }
+
+    public async Task<ChangePlanResult> AddVersionAsync(
+        Guid planId, int expectedVersion, CreatePlanRequest req, string correlationId, CancellationToken ct)
+    {
+        var (latest, failure) = await LoadLatestAsync(planId, expectedVersion, ct);
+        if (failure is not null)
+            return failure;
+
+        var now = time.GetUtcNow();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var effectiveFrom = req.EffectiveFrom ?? today;
+        var tiers = req.Tiers ?? [];
+
+        var draft = new PlanDraft(
+            req.Name, req.Discount, effectiveFrom,
+            tiers.Select(t => new TierDraft(t.Threshold, t.PricePerKwh)).ToList());
+
+        var errors = CatalogRules.ValidatePlan(draft, today, latest!.EffectiveFrom);
+        if (errors.Count > 0)
+            return new ChangePlanResult.ValidationFailed(errors);
+
+        var response = AddVersion(
+            planId, latest.VersionNo + 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, now);
+
+        return await SaveAsync(response, ct);
+    }
+
+    public async Task<ChangePlanResult> RetireAsync(
+        Guid planId, int expectedVersion, DateOnly? effectiveFrom, string correlationId, CancellationToken ct)
+    {
+        var (latest, failure) = await LoadLatestAsync(planId, expectedVersion, ct);
+        if (failure is not null)
+            return failure;
+
+        var now = time.GetUtcNow();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var retiredFrom = effectiveFrom ?? today;
+
+        var errors = CatalogRules.ValidateEffectiveFrom(retiredFrom, today, latest!.EffectiveFrom);
+        if (errors.Count > 0)
+            return new ChangePlanResult.ValidationFailed(errors);
+
+        var response = AddVersion(
+            planId, latest.VersionNo + 1, latest.Name, latest.Discount, VersionStatus.Retired, retiredFrom, [], correlationId, now);
+
+        return await SaveAsync(response, ct);
+    }
+
+    private PlanResponse AddVersion(
+        Guid planId, int versionNo, string name, decimal discount, VersionStatus status,
+        DateOnly effectiveFrom, List<TierRequest> tiers, string correlationId, DateTimeOffset now)
+    {
+        var response = new PlanResponse(planId, versionNo, name, discount, status.ToString(), effectiveFrom, tiers);
+
+        db.PlanVersions.Add(new PlanVersion
+        {
+            PlanId = planId,
+            VersionNo = versionNo,
+            Name = name,
+            Discount = discount,
+            Status = status,
+            EffectiveFrom = effectiveFrom,
+            CreatedAt = now,
+            Tiers = tiers.Select((t, i) => new PlanTier
+            {
+                PlanId = planId,
+                VersionNo = versionNo,
+                TierNo = i + 1,
+                Threshold = t.Threshold,
+                PricePerKwh = t.PricePerKwh
+            }).ToList()
+        });
+
+        db.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = "plan",
+            AggregateId = planId.ToString(),
+            EventType = "PlanVersionCreated",
+            EventVersion = 1,
+            Payload = JsonSerializer.Serialize(response, Json),
+            CorrelationId = correlationId,
+            OccurredAt = now
+        });
+
+        return response;
+    }
+
+    private async Task<(PlanVersion? Latest, ChangePlanResult? Failure)> LoadLatestAsync(
+        Guid planId, int expectedVersion, CancellationToken ct)
+    {
+        var latest = await db.PlanVersions.AsNoTracking()
+            .Where(v => v.PlanId == planId)
+            .OrderByDescending(v => v.VersionNo)
+            .FirstOrDefaultAsync(ct);
+
+        if (latest is null)
+            return (null, new ChangePlanResult.NotFound());
+        if (latest.Status == VersionStatus.Retired)
+            return (null, new ChangePlanResult.Conflict("plan is retired"));
+        if (latest.VersionNo != expectedVersion)
+            return (null, new ChangePlanResult.Conflict("version mismatch"));
+
+        return (latest, null);
+    }
+
+    private async Task<ChangePlanResult> SaveAsync(PlanResponse response, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            TableName: "plan_versions"
+        })
+        {
+            return new ChangePlanResult.Conflict("version mismatch");
+        }
+
+        return new ChangePlanResult.Created(response);
     }
 
     private Task<IdempotencyKey?> FindKeyAsync(string idempotencyKey, CancellationToken ct)
