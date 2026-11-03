@@ -8,9 +8,45 @@ public static class PlanEndpoints
 {
     public static IEndpointRouteBuilder MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/plans", CreatePlan);
-        app.MapPost("/plans/{id:guid}/versions", AddVersion);
-        app.MapDelete("/plans/{id:guid}", RetirePlan);
+        app.MapPost("/plans", CreatePlan)
+            .WithName("CreatePlan")
+            .Produces<PlanResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPost("/plans/{id:guid}/versions", AddVersion)
+            .WithName("AddPlanVersion")
+            .Produces<PlanResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        app.MapDelete("/plans/{id:guid}", RetirePlan)
+            .WithName("RetirePlan")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        app.MapGet("/plans", ListPlans)
+            .WithName("ListPlans")
+            .Produces<List<PlanResponse>>();
+
+        app.MapGet("/plans/{id:guid}", GetPlan)
+            .WithName("GetPlan")
+            .Produces<PlanResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        app.MapGet("/plans/{id:guid}/versions", ListPlanVersions)
+            .WithName("ListPlanVersions")
+            .Produces<List<PlanResponse>>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        app.MapGet("/plans/{id:guid}/versions/{versionNo:int}", GetPlanVersion)
+            .WithName("GetPlanVersion")
+            .Produces<PlanResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -95,6 +131,34 @@ public static class PlanEndpoints
         });
     }
 
+    private static async Task<IResult> ListPlans(bool? includeRetired, PlanService service, CancellationToken ct)
+        => Results.Ok(await service.ListAsync(includeRetired ?? false, ct));
+
+    private static async Task<IResult> GetPlan(Guid id, PlanService service, HttpContext http, CancellationToken ct)
+    {
+        var plan = await service.GetLatestAsync(id, ct);
+        if (plan is null)
+            return PlanNotFound();
+
+        http.Response.Headers.ETag = $"\"{plan.VersionNo}\"";
+        return Results.Ok(plan);
+    }
+
+    private static async Task<IResult> ListPlanVersions(Guid id, PlanService service, CancellationToken ct)
+    {
+        var versions = await service.ListVersionsAsync(id, ct);
+        return versions is null ? PlanNotFound() : Results.Ok(versions);
+    }
+
+    private static async Task<IResult> GetPlanVersion(Guid id, int versionNo, PlanService service, CancellationToken ct)
+    {
+        var version = await service.GetVersionAsync(id, versionNo, ct);
+        return version is null ? PlanNotFound() : Results.Ok(version);
+    }
+
+    private static IResult PlanNotFound()
+        => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The plan was not found.");
+
     private static IResult ToResult(ChangePlanResult result, Func<PlanResponse, IResult> onSuccess)
         => result switch
         {
@@ -102,7 +166,7 @@ public static class PlanEndpoints
             ChangePlanResult.ValidationFailed failed => Results.ValidationProblem(failed.Errors),
             ChangePlanResult.Conflict conflict => Results.Problem(
                 statusCode: StatusCodes.Status409Conflict, title: "Conflict", detail: conflict.Reason),
-            _ => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The plan was not found.")
+            _ => PlanNotFound()
         };
 
     private static string ResolveCorrelationId(string? correlationId)

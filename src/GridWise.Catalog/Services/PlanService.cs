@@ -210,6 +210,54 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
         return new ChangePlanResult.Created(response);
     }
 
+    public async Task<List<PlanResponse>> ListAsync(bool includeRetired, CancellationToken ct)
+    {
+        var latest = await db.PlanVersions.AsNoTracking()
+            .Include(v => v.Tiers)
+            .Where(v => v.VersionNo == db.PlanVersions.Where(x => x.PlanId == v.PlanId).Max(x => x.VersionNo))
+            .Where(v => includeRetired || v.Status != VersionStatus.Retired)
+            .OrderBy(v => v.PlanId)
+            .ToListAsync(ct);
+
+        return latest.Select(ToResponse).ToList();
+    }
+
+    public async Task<PlanResponse?> GetLatestAsync(Guid id, CancellationToken ct)
+    {
+        var latest = await db.PlanVersions.AsNoTracking()
+            .Include(v => v.Tiers)
+            .Where(v => v.PlanId == id)
+            .OrderByDescending(v => v.VersionNo)
+            .FirstOrDefaultAsync(ct);
+
+        return latest is null ? null : ToResponse(latest);
+    }
+
+    public async Task<List<PlanResponse>?> ListVersionsAsync(Guid id, CancellationToken ct)
+    {
+        var versions = await db.PlanVersions.AsNoTracking()
+            .Include(v => v.Tiers)
+            .Where(v => v.PlanId == id)
+            .OrderBy(v => v.VersionNo)
+            .ToListAsync(ct);
+
+        return versions.Count == 0 ? null : versions.Select(ToResponse).ToList();
+    }
+
+    public async Task<PlanResponse?> GetVersionAsync(Guid id, int versionNo, CancellationToken ct)
+    {
+        var version = await db.PlanVersions.AsNoTracking()
+            .Include(v => v.Tiers)
+            .FirstOrDefaultAsync(v => v.PlanId == id && v.VersionNo == versionNo, ct);
+
+        return version is null ? null : ToResponse(version);
+    }
+
+    private static PlanResponse ToResponse(PlanVersion v)
+        => new(
+            v.PlanId, v.VersionNo, v.Name, v.Discount, v.Status.ToString(), v.EffectiveFrom,
+            v.Tiers.OrderBy(t => t.TierNo).Select(t => new TierRequest(t.Threshold, t.PricePerKwh)).ToList());
+
     private Task<IdempotencyKey?> FindKeyAsync(string idempotencyKey, CancellationToken ct)
         => db.IdempotencyKeys.AsNoTracking()
             .FirstOrDefaultAsync(k => k.Endpoint == Endpoint && k.Key == idempotencyKey, ct);

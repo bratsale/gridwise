@@ -4,6 +4,7 @@ using GridWise.Catalog.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ builder.Services.AddDbContext<CatalogDbContext>(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
+builder.Services.AddOpenApi();
 builder.Services.AddScoped<PlanService>();
 
 var app = builder.Build();
@@ -34,6 +36,10 @@ for (var attempt = 1; ; attempt++)
         await Task.Delay(TimeSpan.FromSeconds(2));
     }
 }
+
+app.MapOpenApi();
+if (app.Environment.IsDevelopment())
+    app.MapScalarApiReference();
 
 app.MapPlanEndpoints();
 
