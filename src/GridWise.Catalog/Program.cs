@@ -1,4 +1,6 @@
+using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
+using GridWise.Catalog.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -9,6 +11,11 @@ builder.Services.AddDbContext<CatalogDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Catalog"),
             npgsql => npgsql.EnableRetryOnFailure())
         .UseSnakeCaseNamingConvention());
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddProblemDetails();
+builder.Services.AddValidation();
+builder.Services.AddScoped<PlanService>();
 
 var app = builder.Build();
 
@@ -28,4 +35,8 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
+app.MapPlanEndpoints();
+
 app.Run();
+
+public partial class Program;
