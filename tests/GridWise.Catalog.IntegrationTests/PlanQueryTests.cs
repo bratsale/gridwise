@@ -4,7 +4,8 @@ using GridWise.Catalog.Api;
 
 namespace GridWise.Catalog.IntegrationTests;
 
-public class PlanQueryTests(CatalogFactory factory) : IClassFixture<CatalogFactory>
+[Collection("catalog")]
+public class PlanQueryTests(CatalogFactory factory)
 {
     private static object StandardPlan(string name = "Standard") => new
     {

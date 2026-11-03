@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GridWise.Catalog.IntegrationTests;
 
-public class PostPlanTests(CatalogFactory factory) : IClassFixture<CatalogFactory>
+[Collection("catalog")]
+public class PostPlanTests(CatalogFactory factory)
 {
     private static object StandardPlan(string name = "Standard") => new
     {

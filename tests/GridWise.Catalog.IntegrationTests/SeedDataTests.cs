@@ -6,7 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GridWise.Catalog.IntegrationTests;
 
-public class SeedDataTests(CatalogFactory factory) : IClassFixture<CatalogFactory>
+[Collection("catalog")]
+public class SeedDataTests(CatalogFactory factory)
 {
     private async Task<List<T>> GetList<T>(string url)
         => (await factory.CreateClient().GetFromJsonAsync<List<T>>(url))!;

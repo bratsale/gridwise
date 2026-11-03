@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GridWise.Catalog.IntegrationTests;
 
-public class TaxGroupTests(CatalogFactory factory) : IClassFixture<CatalogFactory>
+[Collection("catalog")]
+public class TaxGroupTests(CatalogFactory factory)
 {
     private static string NewCode() => "test-" + Guid.NewGuid().ToString("N")[..8];
 

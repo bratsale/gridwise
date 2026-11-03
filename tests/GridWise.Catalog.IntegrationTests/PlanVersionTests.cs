@@ -11,7 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GridWise.Catalog.IntegrationTests;
 
-public class PlanVersionTests(CatalogFactory factory) : IClassFixture<CatalogFactory>
+[Collection("catalog")]
+public class PlanVersionTests(CatalogFactory factory)
 {
     private static object StandardPlan(string name = "Standard", string? effectiveFrom = null) => new
     {
