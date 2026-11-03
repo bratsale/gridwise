@@ -17,5 +17,18 @@ services:
       timeout: 3s
       retries: 10
 
+  catalog:
+    build:
+      context: .
+      dockerfile: src/GridWise.Catalog/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=catalog_dev_pw
+    ports:
+      - "5101:8080"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+
 volumes:
   catalog-db-data:
