@@ -1,6 +1,6 @@
-using System.Globalization;
 using GridWise.Catalog.Services;
 using Microsoft.AspNetCore.Mvc;
+using static GridWise.Catalog.Api.EndpointHelpers;
 
 namespace GridWise.Catalog.Api;
 
@@ -10,12 +10,14 @@ public static class PlanEndpoints
     {
         app.MapPost("/plans", CreatePlan)
             .WithName("CreatePlan")
+            .WithTags("Plans")
             .Produces<PlanResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         app.MapPost("/plans/{id:guid}/versions", AddVersion)
             .WithName("AddPlanVersion")
+            .WithTags("Plans")
             .Produces<PlanResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -23,6 +25,7 @@ public static class PlanEndpoints
 
         app.MapDelete("/plans/{id:guid}", RetirePlan)
             .WithName("RetirePlan")
+            .WithTags("Plans")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -30,20 +33,24 @@ public static class PlanEndpoints
 
         app.MapGet("/plans", ListPlans)
             .WithName("ListPlans")
+            .WithTags("Plans")
             .Produces<List<PlanResponse>>();
 
         app.MapGet("/plans/{id:guid}", GetPlan)
             .WithName("GetPlan")
+            .WithTags("Plans")
             .Produces<PlanResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapGet("/plans/{id:guid}/versions", ListPlanVersions)
             .WithName("ListPlanVersions")
+            .WithTags("Plans")
             .Produces<List<PlanResponse>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapGet("/plans/{id:guid}/versions/{versionNo:int}", GetPlanVersion)
             .WithName("GetPlanVersion")
+            .WithTags("Plans")
             .Produces<PlanResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -168,25 +175,4 @@ public static class PlanEndpoints
                 statusCode: StatusCodes.Status409Conflict, title: "Conflict", detail: conflict.Reason),
             _ => PlanNotFound()
         };
-
-    private static string ResolveCorrelationId(string? correlationId)
-        => string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString() : correlationId;
-
-    private static void SetResponseHeaders(HttpContext http, int versionNo, string correlationId)
-    {
-        http.Response.Headers.ETag = $"\"{versionNo}\"";
-        http.Response.Headers["X-Correlation-Id"] = correlationId;
-    }
-
-    private static bool TryParseIfMatch(string? ifMatch, out int version)
-    {
-        version = 0;
-        return ifMatch is not null
-            && int.TryParse(ifMatch.Trim().Trim('"'), NumberStyles.None, CultureInfo.InvariantCulture, out version);
-    }
-
-    private static IResult InvalidIfMatch()
-        => Results.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: "The If-Match header is required and must contain the current version number.");
 }

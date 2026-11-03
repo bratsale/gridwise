@@ -18,6 +18,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<PlanService>();
+builder.Services.AddScoped<TaxGroupService>();
 
 var app = builder.Build();
 
@@ -42,6 +43,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 
 app.MapPlanEndpoints();
+app.MapTaxGroupEndpoints();
 
 app.Run();
 
