@@ -78,8 +78,7 @@ public static class PlanEndpoints
         switch (result)
         {
             case CreatePlanResult.Created created:
-                http.Response.Headers.ETag = "\"1\"";
-                http.Response.Headers["X-Correlation-Id"] = correlationId;
+                SetResponseHeaders(http, created.Plan.VersionNo, correlationId);
                 return Results.Created($"/plans/{created.Plan.Id}", created.Plan);
 
             case CreatePlanResult.ValidationFailed failed:
