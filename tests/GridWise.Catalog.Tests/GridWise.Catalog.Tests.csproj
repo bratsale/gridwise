@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\docs\events\*.json" Link="events\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\GridWise.Catalog\GridWise.Catalog.csproj" />
   </ItemGroup>
 

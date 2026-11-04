@@ -1,0 +1,8 @@
+{
+  "code": "household",
+  "versionNo": 1,
+  "vat": 0.17,
+  "ecoTax": 0.005,
+  "status": "Active",
+  "effectiveFrom": "2026-01-01"
+}

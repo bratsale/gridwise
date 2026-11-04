@@ -2,6 +2,7 @@ using System.Text.Json;
 using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Domain;
+using GridWise.Catalog.Events;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -146,9 +147,11 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
             Id = Guid.CreateVersion7(),
             AggregateType = "tax-group",
             AggregateId = code,
-            EventType = "TaxGroupVersionCreated",
+            EventType = EventTypes.TaxGroupVersionCreated,
             EventVersion = 1,
-            Payload = JsonSerializer.Serialize(response, Json),
+            Payload = JsonSerializer.Serialize(
+                new TaxGroupVersionCreatedV1(code, versionNo, vat, ecoTax, status.ToString(), effectiveFrom),
+                Json),
             CorrelationId = correlationId,
             OccurredAt = now
         });

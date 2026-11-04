@@ -4,6 +4,7 @@ using System.Text.Json;
 using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Domain;
+using GridWise.Catalog.Events;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -164,9 +165,13 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             Id = Guid.CreateVersion7(),
             AggregateType = "plan",
             AggregateId = planId.ToString(),
-            EventType = "PlanVersionCreated",
+            EventType = EventTypes.PlanVersionCreated,
             EventVersion = 1,
-            Payload = JsonSerializer.Serialize(response, Json),
+            Payload = JsonSerializer.Serialize(
+                new PlanVersionCreatedV1(
+                    planId, versionNo, name, discount, status.ToString(), effectiveFrom,
+                    tiers.Select(t => new PlanTierV1(t.Threshold, t.PricePerKwh)).ToList()),
+                Json),
             CorrelationId = correlationId,
             OccurredAt = now
         });
