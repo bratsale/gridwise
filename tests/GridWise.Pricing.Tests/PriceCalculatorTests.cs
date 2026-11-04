@@ -42,6 +42,17 @@ public class PriceCalculatorTests
     [Fact] public void Standard_600_household_total() => AssertTotal(Standard, Household, 600m, 54.64m);
     [Fact] public void Premium_600_household_total() => AssertTotal(Premium, Household, 600m, 47.74m);
 
+    [Fact]
+    public void Vat_on_exact_midpoint_rounds_up()
+    {
+        var flat = new PricingPlan("Flat", [new(null, 0.10m)], 0m);
+
+        var b = PriceCalculator.Calculate(flat, new TaxGroup(0.17m, 0m), 205m);
+
+        Assert.Equal(3.49m, b.VatAmount);
+        Assert.Equal(23.99m, b.Total);
+    }
+
     private static void AssertTotal(PricingPlan plan, TaxGroup group, decimal kwh, decimal expected)
         => Assert.Equal(expected, PriceCalculator.Calculate(plan, group, kwh).Total);
 }
