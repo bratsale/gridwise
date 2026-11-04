@@ -19,6 +19,7 @@ builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<PlanService>();
 builder.Services.AddScoped<TaxGroupService>();
+builder.Services.AddHostedService<IdempotencyKeyCleanup>();
 
 var app = builder.Build();
 
