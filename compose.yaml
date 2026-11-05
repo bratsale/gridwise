@@ -24,6 +24,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=catalog_dev_pw
+      Kafka__BootstrapServers: kafka:9092
     ports:
       - "5101:8080"
     depends_on:

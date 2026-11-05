@@ -1,0 +1,21 @@
+{
+  "id": "5eed0000-0000-0000-0001-000000000001",
+  "type": "PlanVersionCreated",
+  "version": 1,
+  "timestamp": "2026-01-01T00:00:00+00:00",
+  "correlationId": "seed",
+  "data": {
+    "id": "5eed0000-0000-0000-0000-000000000001",
+    "versionNo": 1,
+    "name": "Standard",
+    "discount": 0.05,
+    "status": "Active",
+    "effectiveFrom": "2026-01-01",
+    "tiers": [
+      { "threshold": 100, "pricePerKwh": 0.10 },
+      { "threshold": 300, "pricePerKwh": 0.08 },
+      { "threshold": 500, "pricePerKwh": 0.07 },
+      { "threshold": null, "pricePerKwh": 0.06 }
+    ]
+  }
+}

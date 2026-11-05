@@ -2,7 +2,22 @@
 
 Catalog owns these contracts. Other services get them only as documents (this folder), not as a shared library.
 JSON is camelCase. Dates are `yyyy-MM-dd`. Numbers are decimal.
-The envelope (event type, version, correlation id) is described in ADR 0005.
+The envelope (event type, version, correlation id) is described in ADR 0005 and in the Envelope section below.
+
+## Envelope (v1)
+
+Every Kafka message value is an envelope around the event data. The Kafka key is the aggregate key of the event (see below).
+
+- Sample: [envelope.v1.json](envelope.v1.json)
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | guid | Id of the event (the outbox message id). Unique, use it to deduplicate: delivery is at least once |
+| type | string | Event type, e.g. `PlanVersionCreated` |
+| version | int | Version of the event data, e.g. `1` for `PlanVersionCreated` v1 |
+| timestamp | datetime | When the event occurred (UTC, ISO 8601) |
+| correlationId | string or null | Correlation id of the request that caused the event |
+| data | object | The event data, as described below for the type and version |
 
 ## PlanVersionCreated (v1)
 

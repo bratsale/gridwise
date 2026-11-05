@@ -55,6 +55,34 @@ public class EventContractTests
         Assert.Equal(TaxGroup.EffectiveFrom, e.EffectiveFrom);
     }
 
+    [Fact]
+    public void EventEnvelope_v1_serializes_to_golden_file()
+    {
+        var envelope = new EventEnvelope(
+            Guid.Parse("5eed0000-0000-0000-0001-000000000001"), EventTypes.PlanVersionCreated, 1,
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), "seed",
+            JsonSerializer.SerializeToElement(Plan, Web));
+
+        AssertSameJson("envelope.v1.json", JsonSerializer.Serialize(envelope, Web));
+    }
+
+    [Fact]
+    public void EventEnvelope_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<EventEnvelope>(Golden("envelope.v1.json"), Web)!;
+
+        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0001-000000000001"), e.Id);
+        Assert.Equal(EventTypes.PlanVersionCreated, e.Type);
+        Assert.Equal(1, e.Version);
+        Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), e.Timestamp);
+        Assert.Equal("seed", e.CorrelationId);
+
+        var data = e.Data.Deserialize<PlanVersionCreatedV1>(Web)!;
+        Assert.Equal(Plan.Id, data.Id);
+        Assert.Equal(Plan.Name, data.Name);
+        Assert.Equal(Plan.Tiers.Count, data.Tiers.Count);
+    }
+
     private static string Golden(string file)
         => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "events", file));
 

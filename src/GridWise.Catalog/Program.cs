@@ -20,6 +20,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<PlanService>();
 builder.Services.AddScoped<TaxGroupService>();
 builder.Services.AddHostedService<IdempotencyKeyCleanup>();
+builder.Services.AddHostedService<OutboxPublisher>();
 
 var app = builder.Build();
 
