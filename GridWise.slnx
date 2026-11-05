@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/GridWise.Catalog/GridWise.Catalog.csproj" />
     <Project Path="src/GridWise.Pricing/GridWise.Pricing.csproj" />
+    <Project Path="src/GridWise.Recommendation/GridWise.Recommendation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GridWise.Catalog.IntegrationTests/GridWise.Catalog.IntegrationTests.csproj" />
