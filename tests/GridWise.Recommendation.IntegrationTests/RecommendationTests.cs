@@ -58,11 +58,38 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
 
     private static object Household(decimal kwh) => new { consumptionKwh = kwh, taxGroup = "household" };
 
-    private async Task SeedStandardAndPremium()
+    private async Task<(Guid Standard, Guid Premium)> SeedStandardAndPremium()
     {
         await InsertHousehold();
-        await InsertPlan(Guid.NewGuid(), 1, "Standard", "Active", "2026-01-01", 0.05m, StandardTiers);
-        await InsertPlan(Guid.NewGuid(), 1, "Premium", "Active", "2026-01-01", 0.10m, PremiumTiers);
+        var standard = Guid.NewGuid();
+        var premium = Guid.NewGuid();
+        await InsertPlan(standard, 1, "Standard", "Active", "2026-01-01", 0.05m, StandardTiers);
+        await InsertPlan(premium, 1, "Premium", "Active", "2026-01-01", 0.10m, PremiumTiers);
+        return (standard, premium);
+    }
+
+    private async Task<Guid> CreateRecommendation()
+    {
+        var response = await Post(Household(250m));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<RecommendationResponse>())!.Id;
+    }
+
+    private Task<HttpResponseMessage> Accept(Guid recommendationId, Guid planId, string? correlationId = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/recommendations/{recommendationId}/accept")
+        {
+            Content = JsonContent.Create(new { planId })
+        };
+        if (correlationId is not null)
+            request.Headers.Add("X-Correlation-Id", correlationId);
+        return factory.CreateClient().SendAsync(request);
+    }
+
+    private async Task<T> InDb<T>(Func<RecommendationDbContext, Task<T>> query)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await query(scope.ServiceProvider.GetRequiredService<RecommendationDbContext>());
     }
 
     [Fact]
@@ -202,5 +229,136 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
         var response = await factory.CreateClient().GetAsync($"/recommendations/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Recommended_plan_can_be_accepted()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+        var correlationId = Guid.NewGuid().ToString();
+
+        var response = await Accept(id, premium, correlationId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal($"/recommendations/{id}", response.Headers.Location?.ToString());
+        var body = (await response.Content.ReadFromJsonAsync<AcceptanceResponse>())!;
+        Assert.Equal(id, body.RecommendationId);
+        Assert.Equal(premium, body.PlanId);
+        Assert.Equal(1, body.PlanVersionNo);
+        Assert.Equal(24.10m, body.Total);
+        Assert.Equal(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero), body.AcceptedAt);
+
+        var acceptance = await InDb(db => db.Acceptances.AsNoTracking().SingleAsync(a => a.RecommendationId == id));
+        Assert.Equal(premium, acceptance.PlanId);
+        Assert.Equal(1, acceptance.PlanVersionNo);
+        var outbox = await InDb(db => db.OutboxMessages.AsNoTracking()
+            .SingleAsync(m => m.AggregateId == id.ToString() && m.EventType == "PlanAccepted"));
+        Assert.Equal("recommendation", outbox.AggregateType);
+        Assert.Equal(1, outbox.EventVersion);
+        Assert.Equal(correlationId, outbox.CorrelationId);
+        var payload = JsonDocument.Parse(outbox.Payload).RootElement;
+        Assert.Equal(premium, payload.GetProperty("planId").GetGuid());
+        Assert.Equal(24.10m, payload.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Accepting_the_same_plan_again_returns_the_same_body()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+
+        var first = await Accept(id, premium);
+        var second = await Accept(id, premium);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(await first.Content.ReadAsStringAsync(), await second.Content.ReadAsStringAsync());
+        Assert.Equal(1, await InDb(db => db.Acceptances.CountAsync(a => a.RecommendationId == id)));
+        Assert.Equal(1, await InDb(db => db.OutboxMessages.CountAsync(m => m.AggregateId == id.ToString() && m.EventType == "PlanAccepted")));
+    }
+
+    [Fact]
+    public async Task Accepting_another_plan_conflicts()
+    {
+        var (standard, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+        await Accept(id, premium);
+
+        var response = await Accept(id, standard);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(premium, (await InDb(db => db.Acceptances.AsNoTracking().SingleAsync(a => a.RecommendationId == id))).PlanId);
+    }
+
+    [Fact]
+    public async Task Plan_outside_the_recommendation_is_rejected()
+    {
+        await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+
+        var response = await Accept(id, Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
+        Assert.Contains("planId", problem!.Errors.Keys);
+        Assert.Equal(0, await InDb(db => db.Acceptances.CountAsync(a => a.RecommendationId == id)));
+    }
+
+    [Fact]
+    public async Task Accepting_for_unknown_recommendation_is_not_found()
+    {
+        var response = await Accept(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Newer_plan_version_does_not_change_the_accepted_version()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+        await InsertPlan(premium, 2, "Premium", "Active", "2026-11-05", 0.10m, """[{"threshold":null,"pricePerKwh":0.99}]""");
+
+        var response = await Accept(id, premium);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<AcceptanceResponse>())!;
+        Assert.Equal(1, body.PlanVersionNo);
+        Assert.Equal(24.10m, body.Total);
+        Assert.Equal(1, (await InDb(db => db.Acceptances.AsNoTracking().SingleAsync(a => a.RecommendationId == id))).PlanVersionNo);
+    }
+
+    [Fact]
+    public async Task Parallel_accepts_of_the_same_plan_create_one_acceptance()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => Accept(id, premium)));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
+        Assert.Equal(4, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+        var bodies = await Task.WhenAll(responses.Select(r => r.Content.ReadAsStringAsync()));
+        Assert.Single(bodies.Distinct());
+        Assert.Equal(1, await InDb(db => db.Acceptances.CountAsync(a => a.RecommendationId == id)));
+        Assert.Equal(1, await InDb(db => db.OutboxMessages.CountAsync(m => m.AggregateId == id.ToString() && m.EventType == "PlanAccepted")));
+    }
+
+    [Fact]
+    public async Task Get_shows_the_acceptance()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+        var before = (await factory.CreateClient().GetFromJsonAsync<RecommendationResponse>($"/recommendations/{id}"))!;
+        Assert.Null(before.Acceptance);
+
+        await Accept(id, premium);
+
+        var after = (await factory.CreateClient().GetFromJsonAsync<RecommendationResponse>($"/recommendations/{id}"))!;
+        Assert.NotNull(after.Acceptance);
+        Assert.Equal(premium, after.Acceptance.PlanId);
+        Assert.Equal(1, after.Acceptance.PlanVersionNo);
+        Assert.Equal(24.10m, after.Acceptance.Total);
     }
 }

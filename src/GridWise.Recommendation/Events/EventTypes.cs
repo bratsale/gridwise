@@ -5,6 +5,7 @@ public static class EventTypes
     public const string PlanVersionCreated = "PlanVersionCreated";
     public const string TaxGroupVersionCreated = "TaxGroupVersionCreated";
     public const string RecommendationCalculated = "RecommendationCalculated";
+    public const string PlanAccepted = "PlanAccepted";
 }
 
 public static class Topics

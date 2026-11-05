@@ -12,7 +12,12 @@ public record RecommendationResponse(
     TaxGroupUsed TaxGroup,
     DateTimeOffset CalculatedAt,
     PlanQuoteResponse? Recommended,
-    List<PlanQuoteResponse> Plans);
+    List<PlanQuoteResponse> Plans,
+    AcceptanceResponse? Acceptance = null);
+
+public record AcceptPlanRequest([Required] Guid PlanId);
+
+public record AcceptanceResponse(Guid RecommendationId, Guid PlanId, int PlanVersionNo, decimal Total, DateTimeOffset AcceptedAt);
 
 public record TaxGroupUsed(string Code, int VersionNo, decimal Vat, decimal EcoTax);
 

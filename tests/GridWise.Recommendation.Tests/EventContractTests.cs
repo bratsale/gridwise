@@ -68,6 +68,32 @@ public class EventContractTests
     }
 
     [Fact]
+    public void PlanAccepted_v1_serializes_to_golden_file()
+    {
+        var e = new PlanAcceptedV1(
+            Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), Guid.Parse("5eed0000-0000-0000-0000-000000000002"),
+            1, 24.10m, new DateTimeOffset(2026, 11, 5, 10, 5, 0, TimeSpan.Zero));
+
+        Assert.True(
+            JsonElement.DeepEquals(
+                JsonDocument.Parse(Golden("PlanAccepted.v1.json")).RootElement,
+                JsonSerializer.SerializeToElement(e, Web)),
+            "Serialized event differs from PlanAccepted.v1.json");
+    }
+
+    [Fact]
+    public void PlanAccepted_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<PlanAcceptedV1>(Golden("PlanAccepted.v1.json"), Web)!;
+
+        Assert.Equal(Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), e.RecommendationId);
+        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-000000000002"), e.PlanId);
+        Assert.Equal(1, e.PlanVersionNo);
+        Assert.Equal(24.10m, e.Total);
+        Assert.Equal(new DateTimeOffset(2026, 11, 5, 10, 5, 0, TimeSpan.Zero), e.AcceptedAt);
+    }
+
+    [Fact]
     public void Unknown_fields_are_ignored()
     {
         var withExtra = Golden("PlanVersionCreated.v1.json").Replace("{", """{ "description": "new optional field",""", StringComparison.Ordinal);

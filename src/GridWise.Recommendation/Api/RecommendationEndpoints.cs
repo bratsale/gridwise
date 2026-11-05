@@ -21,6 +21,15 @@ public static class RecommendationEndpoints
             .Produces<RecommendationResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        app.MapPost("/recommendations/{id:guid}/accept", AcceptPlan)
+            .WithName("AcceptPlan")
+            .WithTags("Recommendations")
+            .Produces<AcceptanceResponse>(StatusCodes.Status201Created)
+            .Produces<AcceptanceResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -49,6 +58,31 @@ public static class RecommendationEndpoints
                     statusCode: StatusCodes.Status503ServiceUnavailable,
                     title: "no plans available yet");
         }
+    }
+
+    private static async Task<IResult> AcceptPlan(
+        Guid id,
+        AcceptPlanRequest request,
+        [FromHeader(Name = "X-Correlation-Id")] string? correlationId,
+        RecommendationService service,
+        HttpContext http,
+        CancellationToken ct)
+    {
+        correlationId = ResolveCorrelationId(correlationId);
+
+        var result = await service.AcceptAsync(id, request, correlationId, ct);
+        http.Response.Headers["X-Correlation-Id"] = correlationId;
+
+        return result switch
+        {
+            AcceptResult.Created created => Results.Created($"/recommendations/{id}", created.Acceptance),
+            AcceptResult.AlreadyAccepted existing => Results.Ok(existing.Acceptance),
+            AcceptResult.ValidationFailed failed => Results.ValidationProblem(failed.Errors),
+            AcceptResult.Conflict => Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "A different plan was already accepted for this recommendation."),
+            _ => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Recommendation not found.")
+        };
     }
 
     private static async Task<IResult> GetRecommendation(Guid id, RecommendationService service, CancellationToken ct)

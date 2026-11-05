@@ -74,6 +74,23 @@ Owned by GridWise.Recommendation; it uses the same envelope as above.
 | recommendedTotal | decimal or null | Total price of the cheapest plan |
 | calculatedAt | datetime | When it was calculated (UTC, ISO 8601) |
 
+## PlanAccepted (v1)
+
+Owned by GridWise.Recommendation; it uses the same envelope as above.
+
+- Topic: `recommendation.events`
+- Key: recommendation id (`recommendationId`)
+- Producer: GridWise.Recommendation, once when a plan is accepted for a recommendation
+- Sample: [PlanAccepted.v1.json](PlanAccepted.v1.json)
+
+| Field | Type | Meaning |
+|---|---|---|
+| recommendationId | guid | Id of the recommendation |
+| planId | guid | Accepted plan |
+| planVersionNo | int | Version of the plan that was priced in the recommendation |
+| total | decimal | Total price of that plan in the recommendation |
+| acceptedAt | datetime | When it was accepted (UTC, ISO 8601) |
+
 ## Evolution rules
 
 ### Compatible changes (stay in v1)
