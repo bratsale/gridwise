@@ -30,6 +30,8 @@ services:
     depends_on:
       catalog-db:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
   kafka:
     image: apache/kafka:4.4.0

@@ -27,7 +27,8 @@ public class CatalogFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Catalog"] = _postgres.GetConnectionString()
+                ["ConnectionStrings:Catalog"] = _postgres.GetConnectionString(),
+                ["Kafka:BootstrapServers"] = "unused:9092"
             }));
 
         builder.ConfigureServices(services =>

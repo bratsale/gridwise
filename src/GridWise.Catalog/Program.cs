@@ -8,6 +8,9 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
+    throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
+
 builder.Services.AddDbContext<CatalogDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Catalog"),
             npgsql => npgsql.EnableRetryOnFailure())
