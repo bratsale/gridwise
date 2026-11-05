@@ -35,7 +35,7 @@ public class CatalogFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.RemoveAll<TimeProvider>();
             services.Remove(services.Single(d =>
-                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(IdempotencyKeyCleanup)));
+                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(RetentionCleanup)));
             services.Remove(services.Single(d =>
                 d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(OutboxPublisher)));
             services.AddSingleton<TimeProvider>(new FakeTimeProvider(new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero)));
