@@ -38,6 +38,36 @@ public class EventContractTests
     }
 
     [Fact]
+    public void RecommendationCalculated_v1_serializes_to_golden_file()
+    {
+        var e = new RecommendationCalculatedV1(
+            Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), 250m, "household", 1,
+            Guid.Parse("5eed0000-0000-0000-0000-000000000002"), 1, 24.10m,
+            new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero));
+
+        Assert.True(
+            JsonElement.DeepEquals(
+                JsonDocument.Parse(Golden("RecommendationCalculated.v1.json")).RootElement,
+                JsonSerializer.SerializeToElement(e, Web)),
+            "Serialized event differs from RecommendationCalculated.v1.json");
+    }
+
+    [Fact]
+    public void RecommendationCalculated_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<RecommendationCalculatedV1>(Golden("RecommendationCalculated.v1.json"), Web)!;
+
+        Assert.Equal(Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), e.RecommendationId);
+        Assert.Equal(250m, e.ConsumptionKwh);
+        Assert.Equal("household", e.TaxGroupCode);
+        Assert.Equal(1, e.TaxGroupVersionNo);
+        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-000000000002"), e.RecommendedPlanId);
+        Assert.Equal(1, e.RecommendedPlanVersionNo);
+        Assert.Equal(24.10m, e.RecommendedTotal);
+        Assert.Equal(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero), e.CalculatedAt);
+    }
+
+    [Fact]
     public void Unknown_fields_are_ignored()
     {
         var withExtra = Golden("PlanVersionCreated.v1.json").Replace("{", """{ "description": "new optional field",""", StringComparison.Ordinal);

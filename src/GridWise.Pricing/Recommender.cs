@@ -9,5 +9,6 @@ public static class Recommender
             .Select(plan => new PlanQuote(plan, PriceCalculator.Calculate(plan, taxGroup, kwh)))
             .OrderBy(q => q.Breakdown.Total)
             .ThenBy(q => q.Plan.Name, StringComparer.Ordinal)
+            .ThenBy(q => q.Plan.Id, StringComparer.Ordinal)
             .ToList();
 }

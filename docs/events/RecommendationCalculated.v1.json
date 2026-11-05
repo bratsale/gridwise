@@ -1,0 +1,10 @@
+{
+  "recommendationId": "01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666",
+  "consumptionKwh": 250,
+  "taxGroupCode": "household",
+  "taxGroupVersionNo": 1,
+  "recommendedPlanId": "5eed0000-0000-0000-0000-000000000002",
+  "recommendedPlanVersionNo": 1,
+  "recommendedTotal": 24.10,
+  "calculatedAt": "2026-11-05T10:00:00+00:00"
+}

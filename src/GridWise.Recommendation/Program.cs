@@ -1,3 +1,4 @@
+using GridWise.Recommendation.Api;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,9 @@ builder.Services.AddDbContext<RecommendationDbContext>(options =>
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
+builder.Services.AddValidation();
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddSingleton<CatalogEventHandler>();
 builder.Services.AddHostedService<CatalogConsumer>();
 
@@ -45,6 +48,8 @@ for (var attempt = 1; ; attempt++)
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
+
+app.MapRecommendationEndpoints();
 
 app.Run();
 

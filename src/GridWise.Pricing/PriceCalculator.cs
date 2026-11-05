@@ -1,6 +1,6 @@
 namespace GridWise.Pricing;
 
-public sealed record PricingPlan(string Name, IReadOnlyList<PricingTier> Tiers, decimal DiscountRate);
+public sealed record PricingPlan(string Name, IReadOnlyList<PricingTier> Tiers, decimal DiscountRate, string Id = "");
 
 public sealed record TaxGroup(decimal VatRate, decimal EcoTaxPerKwh);
 

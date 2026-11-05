@@ -26,6 +26,17 @@ public class RecommenderTests
     }
 
     [Fact]
+    public void Equal_totals_and_names_are_ordered_by_id()
+    {
+        var second = PriceCalculatorTests.Standard with { Id = "b:1" };
+        var first = PriceCalculatorTests.Standard with { Id = "a:2" };
+
+        var ranked = Recommender.Rank([second, first], PriceCalculatorTests.Household, 250m);
+
+        Assert.Equal("a:2,b:1", string.Join(",", ranked.Select(r => r.Plan.Id)));
+    }
+
+    [Fact]
     public void No_plans_gives_empty_result()
         => Assert.Empty(Recommender.Rank([], PriceCalculatorTests.Household, 250m));
 }

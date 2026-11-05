@@ -54,6 +54,26 @@ Every Kafka message value is an envelope around the event data. The Kafka key is
 | status | string | `Active` or `Retired` |
 | effectiveFrom | date | First day (UTC) the version applies |
 
+## RecommendationCalculated (v1)
+
+Owned by GridWise.Recommendation; it uses the same envelope as above.
+
+- Topic: `recommendation.events`
+- Key: recommendation id (`recommendationId`)
+- Producer: GridWise.Recommendation, one event for every calculated recommendation
+- Sample: [RecommendationCalculated.v1.json](RecommendationCalculated.v1.json)
+
+| Field | Type | Meaning |
+|---|---|---|
+| recommendationId | guid | Id of the recommendation |
+| consumptionKwh | decimal | Consumption the recommendation was calculated for |
+| taxGroupCode | string | Tax group used |
+| taxGroupVersionNo | int | Version of the tax group used |
+| recommendedPlanId | guid or null | Cheapest plan, `null` if there was none |
+| recommendedPlanVersionNo | int or null | Version of the cheapest plan that was priced |
+| recommendedTotal | decimal or null | Total price of the cheapest plan |
+| calculatedAt | datetime | When it was calculated (UTC, ISO 8601) |
+
 ## Evolution rules
 
 ### Compatible changes (stay in v1)

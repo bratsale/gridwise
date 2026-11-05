@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 using Testcontainers.PostgreSql;
 
 namespace GridWise.Recommendation.IntegrationTests;
@@ -31,7 +33,11 @@ public class RecommendationFactory : WebApplicationFactory<Program>, IAsyncLifet
             }));
 
         builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
             services.Remove(services.Single(d =>
-                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(CatalogConsumer))));
+                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(CatalogConsumer)));
+            services.AddSingleton<TimeProvider>(new FakeTimeProvider(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero)));
+        });
     }
 }
