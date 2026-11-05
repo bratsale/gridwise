@@ -56,6 +56,29 @@ Every Kafka message value is an envelope around the event data. The Kafka key is
 
 ## Evolution rules
 
-- Within a version only optional fields may be added.
-- Consumers ignore fields they do not know.
-- A breaking change (remove, rename, change type or meaning) is a new event version (`V2`), published alongside the old one for a transition period. The old version is removed only after all consumers have moved.
+### Compatible changes (stay in v1)
+
+- Add an optional field. Example: `PlanVersionCreated` gets `description`. Old consumers ignore it.
+- Add a new event type. Example: `PlanRetired` on `catalog.plan-events`. Consumers that do not know it skip it.
+
+### Breaking changes (new version)
+
+- Rename or remove a field, change its type or its meaning.
+- Example: `discount` changes from a rate (`0.05`) to a percentage (`5`). The name and type are the same but the meaning is not, so old consumers would calculate wrong prices.
+
+### Rollout of a breaking change
+
+1. The producer publishes `PlanVersionCreated` with `version: 2` in the envelope, on the same topic.
+2. For a transition period it publishes both v1 and v2 for every change. If all consumers already support v2, it can publish only v2.
+3. Consumers dispatch on `version`.
+4. v1 is retired when no consumer reads it any more.
+
+### Consumer rules
+
+- Ignore unknown fields.
+- Unknown event type: skip it and mark it as processed.
+- Unknown version: send it to the dead-letter topic. Reprocess it after the consumer is updated.
+
+### Why the version is in the envelope, not in the topic name
+
+All versions of a plan go through the same topic with the same key, so they stay in one partition and arrive in the order they happened. With a topic per version (`catalog.plan-events.v2`) the order across versions would be lost.
