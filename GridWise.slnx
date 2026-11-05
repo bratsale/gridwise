@@ -8,5 +8,7 @@
     <Project Path="tests/GridWise.Catalog.IntegrationTests/GridWise.Catalog.IntegrationTests.csproj" />
     <Project Path="tests/GridWise.Catalog.Tests/GridWise.Catalog.Tests.csproj" />
     <Project Path="tests/GridWise.Pricing.Tests/GridWise.Pricing.Tests.csproj" />
+    <Project Path="tests/GridWise.Recommendation.IntegrationTests/GridWise.Recommendation.IntegrationTests.csproj" />
+    <Project Path="tests/GridWise.Recommendation.Tests/GridWise.Recommendation.Tests.csproj" />
   </Folder>
 </Solution>

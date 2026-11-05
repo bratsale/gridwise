@@ -1,10 +1,17 @@
 using GridWise.Recommendation.Data;
+using GridWise.Recommendation.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+foreach (var setting in new[] { "Kafka:BootstrapServers", "Kafka:GroupId" })
+{
+    if (string.IsNullOrEmpty(builder.Configuration[setting]))
+        throw new InvalidOperationException($"{setting} is not configured.");
+}
 
 builder.Services.AddDbContext<RecommendationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Recommendation"),
@@ -14,6 +21,8 @@ builder.Services.AddDbContext<RecommendationDbContext>(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<CatalogEventHandler>();
+builder.Services.AddHostedService<CatalogConsumer>();
 
 var app = builder.Build();
 

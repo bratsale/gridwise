@@ -56,11 +56,14 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=recommendation_dev_pw
+      Kafka__BootstrapServers: kafka:9092
     ports:
       - "5102:8080"
     depends_on:
       recommendation-db:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
   kafka:
     image: apache/kafka:4.4.0
