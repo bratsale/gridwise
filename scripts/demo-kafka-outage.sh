@@ -11,6 +11,8 @@ step() { printf '\n=== %s ===\n' "$1"; }
 expect() { printf 'Expect: %s\n' "$1"; }
 psql_catalog() { docker compose exec -T catalog-db psql -U catalog -d catalog -At -c "$1"; }
 outbox_rows() { psql_catalog "SELECT event_type, aggregate_id, coalesce(published_at::text, 'NULL') FROM outbox_messages WHERE aggregate_id = '$PLAN_ID' ORDER BY occurred_at, id"; }
+psql_recommendation() { docker compose exec -T recommendation-db psql -U recommendation -d recommendation -At -c "$1"; }
+read_model_count() { psql_recommendation "SELECT count(*) FROM plan_versions WHERE plan_id = '$PLAN_ID' AND version_no IN (1, 2)"; }
 published_count() { psql_catalog "SELECT count(*) FROM outbox_messages WHERE aggregate_id = '$PLAN_ID' AND published_at IS NOT NULL"; }
 
 # Poll "$@" every 2 s until it succeeds or $TIMEOUT seconds pass.
@@ -23,8 +25,9 @@ wait_for() {
   done
 }
 
-kafka_healthy() { docker compose ps kafka | grep -q '(healthy)'; }
-publisher_warned() { docker compose logs --no-log-prefix catalog | grep -q 'Outbox publishing failed'; }
+kafka_healthy() { [[ "$(docker compose ps kafka | grep -c '(healthy)' || true)" -gt 0 ]]; }
+publisher_warned() { [[ "$(docker compose logs --no-log-prefix catalog | grep -c 'Outbox publishing failed' || true)" -gt 0 ]]; }
+read_model_ready() { [[ "$(read_model_count)" == 2 ]]; }
 all_published() { [[ "$(published_count)" == 2 ]]; }
 
 step "1. Start the stack"
@@ -81,7 +84,14 @@ wait_for 60 all_published || echo "(rows were not all published within 60 s)"
 outbox_rows
 PUBLISHED=$(published_count)
 
-step "7. Read $TOPIC from the beginning"
+step "7. Recommendation read model"
+echo "Does: polls recommendation-db until plan_versions has versions 1 and 2 of this plan (max 60 s)."
+expect "both versions arrive through Kafka and the consumer."
+wait_for 60 read_model_ready || echo "(read model did not get both versions within 60 s)"
+psql_recommendation "SELECT plan_id, version_no, name FROM plan_versions WHERE plan_id = '$PLAN_ID' ORDER BY version_no"
+READ_MODEL=$(read_model_count)
+
+step "8. Read $TOPIC from the beginning"
 echo "Does: kafka-console-consumer with print.key, timeout 10 s; counts messages with key $PLAN_ID."
 expect "exactly 2 messages with this key."
 COUNT=$(docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh \
@@ -90,10 +100,13 @@ COUNT=$(docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh \
   | grep -c "^${PLAN_ID}"$'\t' || true)
 echo "Messages with key $PLAN_ID: $COUNT"
 
-step "8. Result"
-if [[ "$COUNT" == 2 && "$PUBLISHED" == 2 ]]; then
-  echo "PASS: 2 messages in Kafka, 2 outbox rows published."
+step "9. Pipeline status"
+bash scripts/pipeline-status.sh
+
+step "10. Result"
+if [[ "$COUNT" == 2 && "$PUBLISHED" == 2 && "$READ_MODEL" == 2 ]]; then
+  echo "PASS: 2 messages in Kafka, 2 outbox rows published, 2 plan versions in the Recommendation read model."
 else
-  echo "FAIL: messages in Kafka = $COUNT (expected 2), published outbox rows = $PUBLISHED (expected 2)."
+  echo "FAIL: messages in Kafka = $COUNT (expected 2), published outbox rows = $PUBLISHED (expected 2), read model versions = $READ_MODEL (expected 2)."
   exit 1
 fi

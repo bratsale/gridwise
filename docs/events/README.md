@@ -129,6 +129,39 @@ Run it again later. Handling is idempotent, so running it twice is safe.
 Messages are not moved back to the source topic: that would bring them again to every consumer group of that topic,
 and out of order with newer events of the same key. The reprocess command applies them to this service only.
 
+## Monitoring the pipeline
+
+Three numbers tell whether events flow from Catalog to Recommendation:
+
+| Number | Meaning | Healthy |
+|---|---|---|
+| Outbox backlog (per service) | Rows written to the outbox but not yet sent to Kafka (`published_at IS NULL`), and the age of the oldest one | 0, or a few rows younger than a few seconds |
+| Consumer lag (group `recommendation`) | Messages in the source topics that Recommendation has not processed yet | 0, or small and falling |
+| DLQ size | Messages in `recommendation.dlq` | 0 |
+
+Read them all with `scripts/pipeline-status.sh` (needs the compose stack running). The raw commands:
+
+```
+# outbox backlog (use recommendation-db / recommendation for the other service)
+docker compose exec -T catalog-db psql -U catalog -d catalog -c \
+  "SELECT count(*), min(occurred_at) FROM outbox_messages WHERE published_at IS NULL"
+
+# consumer lag: the LAG column per partition
+docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --describe --group recommendation
+
+# DLQ size: end offsets minus start offsets (--time -1 = end, -2 = start), summed over partitions
+docker compose exec kafka /opt/kafka/bin/kafka-get-offsets.sh \
+  --bootstrap-server localhost:9092 --topic recommendation.dlq --time -1
+```
+
+"Events are late" checklist:
+
+1. Catalog outbox backlog growing: the Catalog publisher or Kafka is the problem. Check the Catalog log for `Outbox publishing failed` and whether Kafka is healthy. Nothing is lost, the rows are sent when Kafka is back.
+2. Outbox backlog is 0 but consumer lag is growing: the Recommendation consumer or its database is the problem. Check the Recommendation log and `recommendation-db`.
+3. DLQ growing: poison messages. Read the `error` header (see Dead-letter topic), fix the cause, then reprocess.
+4. Recommendation outbox backlog growing: same as 1, for `recommendation.events`.
+
 ## Evolution rules
 
 ### Compatible changes (stay in v1)
