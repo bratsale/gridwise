@@ -91,6 +91,44 @@ Owned by GridWise.Recommendation; it uses the same envelope as above.
 | total | decimal | Total price of that plan in the recommendation |
 | acceptedAt | datetime | When it was accepted (UTC, ISO 8601) |
 
+## Dead-letter topic
+
+`recommendation.dlq` holds messages that GridWise.Recommendation could not process:
+
+- a poison message (not valid JSON, not an envelope, data that cannot be read)
+- an unknown version of a known event type
+- a message that still failed after 3 attempts
+
+The key and value are copied unchanged. Headers:
+
+| Header | Meaning |
+|---|---|
+| source-topic, source-partition, source-offset | Where the message came from |
+| error | Why it failed (the last error) |
+| attempt | Set by the reprocess command: how many times reprocessing has failed so far (absent = never reprocessed) |
+
+Inspect it:
+
+```
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+  --topic recommendation.dlq --from-beginning --timeout-ms 10000 \
+  --property print.key=true --property print.headers=true
+```
+
+Reprocess it, after the cause is fixed (for example the consumer is updated to the new version):
+
+```
+docker compose run --rm recommendation reprocess-dlq
+```
+
+The command handles the messages that are in the topic when it starts, with the same handler as the consumer, then exits.
+It prints how many were reprocessed and how many failed again. Exit code 0 means nothing failed again, 1 means some did.
+A message that fails again is written to the end of `recommendation.dlq` with `attempt` + 1 and the new error, so it is not handled twice in one run.
+Run it again later. Handling is idempotent, so running it twice is safe.
+
+Messages are not moved back to the source topic: that would bring them again to every consumer group of that topic,
+and out of order with newer events of the same key. The reprocess command applies them to this service only.
+
 ## Evolution rules
 
 ### Compatible changes (stay in v1)
