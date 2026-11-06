@@ -23,9 +23,12 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
+builder.Services.AddHealthChecks().AddDbContextCheck<RecommendationDbContext>(tags: ["ready"]);
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddSingleton<CatalogEventHandler>();
 builder.Services.AddHostedService<CatalogConsumer>();
+builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.AddHostedService<RetentionCleanup>();
 
 var app = builder.Build();
 
@@ -46,6 +49,8 @@ for (var attempt = 1; ; attempt++)
 }
 
 app.MapOpenApi();
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
 if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 

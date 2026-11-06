@@ -35,8 +35,9 @@ public class RecommendationFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<TimeProvider>();
-            services.Remove(services.Single(d =>
-                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(CatalogConsumer)));
+            foreach (var hostedService in new[] { typeof(CatalogConsumer), typeof(OutboxPublisher), typeof(RetentionCleanup) })
+                services.Remove(services.Single(d =>
+                    d.ServiceType == typeof(IHostedService) && d.ImplementationType == hostedService));
             services.AddSingleton<TimeProvider>(new FakeTimeProvider(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero)));
         });
     }

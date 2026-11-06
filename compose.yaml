@@ -27,6 +27,12 @@ services:
       Kafka__BootstrapServers: kafka:9092
     ports:
       - "5101:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     depends_on:
       catalog-db:
         condition: service_healthy
@@ -59,6 +65,12 @@ services:
       Kafka__BootstrapServers: kafka:9092
     ports:
       - "5102:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     depends_on:
       recommendation-db:
         condition: service_healthy

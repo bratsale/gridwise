@@ -23,17 +23,15 @@ wait_for() {
   done
 }
 
-api_ready() { [[ "$(curl -s -o /dev/null -w '%{http_code}' "$API/plans")" == 200 ]]; }
 kafka_healthy() { docker compose ps kafka | grep -q '(healthy)'; }
 publisher_warned() { docker compose logs --no-log-prefix catalog | grep -q 'Outbox publishing failed'; }
 all_published() { [[ "$(published_count)" == 2 ]]; }
 
 step "1. Start the stack"
-echo "Does: docker compose up -d --build, then waits for GET $API/plans = 200 (max 120 s)."
-expect "stack is up and the API answers 200."
-docker compose up -d --build
-wait_for 120 api_ready || { echo "FAIL: API did not become ready within 120 s"; exit 1; }
-echo "API is ready."
+echo "Does: docker compose up -d --build --wait (returns when catalog and recommendation are healthy)."
+expect "stack is up and healthy."
+docker compose up -d --build --wait || { echo "FAIL: stack did not become healthy"; exit 1; }
+echo "Stack is healthy."
 
 step "2. Stop Kafka"
 echo "Does: docker compose stop kafka."
