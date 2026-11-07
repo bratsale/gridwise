@@ -1,33 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { components as CatalogTypes } from '../api/catalog.ts'
 import type { components as RecommendationTypes } from '../api/recommendation.ts'
 import { request, type ProblemDetails } from '../api/client.ts'
+import { errorsFor } from '../api/problems.ts'
+import { formatKwh, formatMoney, formatPrice } from '../format.ts'
+import { FieldErrors } from './FieldErrors.tsx'
 
 type TaxGroup = CatalogTypes['schemas']['TaxGroupResponse']
 type Recommendation = RecommendationTypes['schemas']['RecommendationResponse']
 type Quote = RecommendationTypes['schemas']['PlanQuoteResponse']
 type Acceptance = RecommendationTypes['schemas']['AcceptanceResponse']
 type Breakdown = RecommendationTypes['schemas']['BreakdownResponse']
-
-type Value = number | string
-
-const money = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const quantity = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 })
-const price = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-
-// Display only: the API sends the amounts, nothing is calculated here.
-const formatMoney = (value: Value) => money.format(Number(value))
-
-// ProblemDetails errors have keys like "consumptionKwh"; compare ignoring case.
-function fieldErrors(problem: ProblemDetails | undefined, field: string): string[] {
-  const errors = problem?.errors ?? {}
-  const key = Object.keys(errors).find((k) => k.toLowerCase() === field.toLowerCase())
-  return key ? errors[key] : []
-}
-
-function FieldErrors({ messages }: { messages: string[] }) {
-  return messages.length > 0 ? <p className="field-error">{messages.join(' ')}</p> : null
-}
 
 function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
   return (
@@ -36,7 +19,7 @@ function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
         {breakdown.tiers.map((tier, i) => (
           <tr key={i}>
             <td>
-              {quantity.format(Number(tier.kwh))} kWh × {price.format(Number(tier.pricePerKwh))}
+              {formatKwh(tier.kwh)} × {formatPrice(tier.pricePerKwh)}
             </td>
             <td className="num">{formatMoney(tier.amount)}</td>
           </tr>
@@ -55,6 +38,7 @@ function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
 
 export function Customer() {
   const [taxGroups, setTaxGroups] = useState<TaxGroup[]>([])
+  const [taxGroupsLoading, setTaxGroupsLoading] = useState(true)
   const [taxGroupsError, setTaxGroupsError] = useState<string | null>(null)
 
   const [consumption, setConsumption] = useState('')
@@ -65,9 +49,15 @@ export function Customer() {
 
   const [result, setResult] = useState<Recommendation | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
-  const [accepting, setAccepting] = useState(false)
+  const [accepting, setAccepting] = useState<string | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
   const [accepted, setAccepted] = useState<string | null>(null)
   const [acceptError, setAcceptError] = useState<string | null>(null)
+
+  // After calculating, focus moves to the result.
+  useEffect(() => {
+    if (result) resultRef.current?.focus()
+  }, [result])
 
   useEffect(() => {
     void (async () => {
@@ -83,6 +73,7 @@ export function Customer() {
       } catch {
         setTaxGroupsError('Tax groups could not be loaded.')
       }
+      setTaxGroupsLoading(false)
     })()
   }, [])
 
@@ -125,7 +116,7 @@ export function Customer() {
 
   async function accept(quote: Quote) {
     if (!result) return
-    setAccepting(true)
+    setAccepting(`${quote.planId}:${String(quote.planVersionNo)}`)
     setAcceptError(null)
 
     try {
@@ -144,7 +135,7 @@ export function Customer() {
     } catch {
       setAcceptError('The service could not be reached.')
     } finally {
-      setAccepting(false)
+      setAccepting(null)
     }
   }
 
@@ -169,30 +160,33 @@ export function Customer() {
             value={consumption}
             onChange={(e) => setConsumption(e.target.value)}
           />
-          <FieldErrors messages={fieldErrors(problem, 'consumptionKwh')} />
+          <FieldErrors messages={errorsFor(problem, 'consumptionKwh')} />
         </label>
 
         <label>
           Tax group
           <select required value={taxGroup} onChange={(e) => setTaxGroup(e.target.value)}>
+            {taxGroupsLoading && <option value="">Loading…</option>}
             {taxGroups.map((g) => (
               <option key={g.code} value={g.code}>{g.code}</option>
             ))}
           </select>
-          <FieldErrors messages={fieldErrors(problem, 'taxGroup')} />
+          <FieldErrors messages={errorsFor(problem, 'taxGroup')} />
         </label>
 
-        <button type="submit" disabled={submitting || taxGroups.length === 0}>Calculate</button>
+        <button type="submit" disabled={submitting || taxGroups.length === 0}>
+          {submitting ? 'Calculating…' : 'Calculate'}
+        </button>
       </form>
 
       {taxGroupsError && <p className="error">{taxGroupsError}</p>}
       {message && <p className="error">{message}</p>}
 
       {result && (
-        <div className="result">
+        <div className="result" ref={resultRef} tabIndex={-1}>
           <p className="meta">
-            Tax group {result.taxGroup.code} (version {String(result.taxGroup.versionNo)}), calculated at{' '}
-            {new Date(result.calculatedAt).toLocaleString()}
+            {formatKwh(result.consumptionKwh)}, tax group {result.taxGroup.code} (version {String(result.taxGroup.versionNo)}),
+            calculated at {new Date(result.calculatedAt).toLocaleString()}
           </p>
 
           <table className="plans">
@@ -225,8 +219,8 @@ export function Customer() {
                     <td>{String(quote.planVersionNo)}</td>
                     <td className="num">{formatMoney(quote.total)}</td>
                     <td>
-                      <button type="button" disabled={accepting || accepted !== null} onClick={() => void accept(quote)}>
-                        Accept
+                      <button type="button" disabled={accepting !== null || accepted !== null} onClick={() => void accept(quote)}>
+                        {accepting === key ? 'Accepting…' : 'Accept'}
                       </button>
                     </td>
                   </tr>,
