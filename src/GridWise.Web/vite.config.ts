@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 // The same /api/... paths as nginx in the container: the prefix is stripped before the request reaches the service.
 export default defineConfig({

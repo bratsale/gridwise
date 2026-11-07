@@ -1,24 +1,22 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import { useT } from '../../shared/i18n/LanguageProvider.tsx'
+import type { AdminSection } from '../../shared/routing/route.ts'
 import { Loading } from '../../shared/ui/Loading.tsx'
 
 // Each admin page is its own chunk, loaded when its sub-tab is first opened.
 const PlansPage = lazy(() => import('./plans/PlansPage.tsx').then((m) => ({ default: m.PlansPage })))
 const TaxGroupsPage = lazy(() => import('./taxGroups/TaxGroupsPage.tsx').then((m) => ({ default: m.TaxGroupsPage })))
 
-type Section = 'plans' | 'taxGroups'
-
-export function AdminPage() {
+export function AdminPage({ section, onSection }: { section: AdminSection; onSection: (section: AdminSection) => void }) {
   const t = useT()
-  const [section, setSection] = useState<Section>('plans')
 
   return (
     <div>
       <div className="subtabs" role="tablist">
-        <button role="tab" aria-selected={section === 'plans'} onClick={() => setSection('plans')}>
+        <button role="tab" aria-selected={section === 'plans'} onClick={() => onSection('plans')}>
           {t('admin.plans')}
         </button>
-        <button role="tab" aria-selected={section === 'taxGroups'} onClick={() => setSection('taxGroups')}>
+        <button role="tab" aria-selected={section === 'taxGroups'} onClick={() => onSection('taxGroups')}>
           {t('admin.taxGroups')}
         </button>
       </div>
