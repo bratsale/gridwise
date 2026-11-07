@@ -151,15 +151,18 @@ export function Customer() {
     <section>
       <form onSubmit={(e) => void calculate(e)} className="form">
         <label>
-          Consumption (kWh)
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            required
-            value={consumption}
-            onChange={(e) => setConsumption(e.target.value)}
-          />
+          Consumption
+          <div className="unit">
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              required
+              value={consumption}
+              onChange={(e) => setConsumption(e.target.value)}
+            />
+            <span>kWh</span>
+          </div>
           <FieldErrors messages={errorsFor(problem, 'consumptionKwh')} />
         </label>
 
@@ -174,7 +177,7 @@ export function Customer() {
           <FieldErrors messages={errorsFor(problem, 'taxGroup')} />
         </label>
 
-        <button type="submit" disabled={submitting || taxGroups.length === 0}>
+        <button type="submit" className="primary" disabled={submitting || taxGroups.length === 0}>
           {submitting ? 'Calculating…' : 'Calculate'}
         </button>
       </form>
@@ -189,6 +192,7 @@ export function Customer() {
             calculated at {new Date(result.calculatedAt).toLocaleString()}
           </p>
 
+          <div className="card flush table-wrap">
           <table className="plans">
             <thead>
               <tr>
@@ -214,12 +218,12 @@ export function Customer() {
                       >
                         {isOpen ? '▾' : '▸'} {quote.name}
                       </button>
-                      {isBest && <span className="badge">Best</span>}
+                      {isBest && <span className="badge best">Best</span>}
                     </td>
                     <td>{String(quote.planVersionNo)}</td>
                     <td className="num">{formatMoney(quote.total)}</td>
                     <td>
-                      <button type="button" disabled={accepting !== null || accepted !== null} onClick={() => void accept(quote)}>
+                      <button type="button" className="small primary" disabled={accepting !== null || accepted !== null} onClick={() => void accept(quote)}>
                         {accepting === key ? 'Accepting…' : 'Accept'}
                       </button>
                     </td>
@@ -235,8 +239,9 @@ export function Customer() {
               })}
             </tbody>
           </table>
+          </div>
 
-          {accepted && <p className="success">{accepted}</p>}
+          {accepted && <p className="banner success" role="status"><span>{accepted}</span></p>}
           {acceptError && <p className="error">{acceptError}</p>}
         </div>
       )}

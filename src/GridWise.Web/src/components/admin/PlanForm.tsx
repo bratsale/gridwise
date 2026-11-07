@@ -102,11 +102,14 @@ export function PlanForm({
       </label>
 
       <label>
-        Discount (%)
-        <input
-          type="number" step="0.01" min="0" max="100" required
-          value={discount} onChange={(e) => setDiscount(e.target.value)}
-        />
+        Discount
+        <div className="unit">
+          <input
+            type="number" step="0.01" min="0" max="100" required
+            value={discount} onChange={(e) => setDiscount(e.target.value)}
+          />
+          <span>%</span>
+        </div>
         <span className="hint">Percentage of the energy sum: 5 = 5%</span>
         <FieldErrors messages={errorsFor(problem, 'discount')} />
       </label>
@@ -123,12 +126,12 @@ export function PlanForm({
       {message && <p className="error">{message}</p>}
       {conflict && (
         <p className="error">
-          {CONFLICT_MESSAGE} <button type="button" onClick={() => void reload()}>Reload</button>
+          <span>{CONFLICT_MESSAGE} </span><button type="button" className="small" onClick={() => void reload()}>Reload</button>
         </p>
       )}
 
       <div className="actions">
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="primary" disabled={submitting}>
           {submitting ? 'Saving…' : editing ? 'Save new version' : 'Create plan'}
         </button>
         <button type="button" onClick={onCancel}>Cancel</button>

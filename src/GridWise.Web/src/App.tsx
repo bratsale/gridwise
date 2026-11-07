@@ -9,7 +9,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>GridWise</h1>
+      <header className="app-header">
+        <h1>GridWise</h1>
+        <p className="subtitle">Energy plans and recommendations</p>
+      </header>
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'admin'} onClick={() => setTab('admin')}>
           Admin

@@ -74,16 +74,19 @@ export function Admin() {
   return (
     <section>
       <div className="toolbar">
-        <button type="button" onClick={() => openForm({ mode: 'create' })}>New plan</button>
+        <button type="button" className="primary" onClick={() => openForm({ mode: 'create' })}>New plan</button>
         <button type="button" disabled={loading} onClick={() => void load()}>Refresh</button>
       </div>
 
       {notice && (
         <div className="notice" role="status">
-          <span>
-            {notice}. <span className="hint">Changes reach recommendations within a few seconds.</span>
-          </span>
-          <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)}>✕</button>
+          <div className="banner success">
+            <span>{notice}.</span>
+            <button type="button" className="icon" aria-label="Dismiss" onClick={() => setNotice(null)}>✕</button>
+          </div>
+          <div className="banner info">
+            <span>Changes reach recommendations within a few seconds.</span>
+          </div>
         </div>
       )}
       {listError && <p className="error">{listError}</p>}

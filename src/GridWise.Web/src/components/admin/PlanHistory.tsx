@@ -13,12 +13,13 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
     <div className="panel">
       <h3>History of "{plan.name}"</h3>
       {versions === null ? (
-        <p>Loading…</p>
+        <p className="state" role="status"><span className="spinner" aria-hidden="true" />Loading…</p>
       ) : versions.length === 0 ? (
-        <p>No versions.</p>
+        <p className="state">No versions.</p>
       ) : (
         <>
-        {retiredFrom(versions) && <p><strong>Plan retired from {retiredFrom(versions)}</strong></p>}
+        {retiredFrom(versions) && <p className="banner info"><span>Plan retired from {retiredFrom(versions)}</span></p>}
+        <div className="table-wrap">
         <table className="plans">
           <thead>
             <tr>
@@ -29,7 +30,7 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
             {versions.map((v) => (
               <tr key={String(v.versionNo)}>
                 <td>{String(v.versionNo)}</td>
-                <td>{v.status}</td>
+                <td><span className={`badge ${v.status === 'Retired' ? 'retired' : 'active'}`}>{v.status}</span></td>
                 <td>{v.effectiveFrom}</td>
                 <td className="num">{formatPercent(v.discount)}</td>
                 <td>
@@ -43,6 +44,7 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
             ))}
           </tbody>
         </table>
+        </div>
         </>
       )}
     </div>

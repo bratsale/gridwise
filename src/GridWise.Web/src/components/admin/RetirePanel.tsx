@@ -63,13 +63,14 @@ export function RetirePanel({
       {general.length > 0 && <p className="error">{general.join(' ')}</p>}
       {message && <p className="error">{message}</p>}
       <div className="actions">
-        <button type="submit" disabled={submitting}>{submitting ? 'Retiring…' : 'Retire plan'}</button>
+        <button type="submit" className="danger" disabled={submitting}>{submitting ? 'Retiring…' : 'Retire plan'}</button>
         <button type="button" onClick={onCancel}>Cancel</button>
       </div>
       <ConfirmDialog
         open={confirming}
         message={`Retire "${plan.name}" from ${effectiveFrom}?`}
         confirmLabel="Retire"
+        danger
         onConfirm={() => void retire()}
         onCancel={() => setConfirming(false)}
       />

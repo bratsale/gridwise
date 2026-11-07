@@ -10,10 +10,13 @@ export function PlanList({
   onEdit: (plan: Plan) => void
   onRetire: (plan: Plan) => void
 }) {
-  if (loading) return <p>Loading…</p>
-  if (plans.length === 0) return <p>No plans yet.</p>
+  if (loading) {
+    return <div className="card"><p className="state" role="status"><span className="spinner" aria-hidden="true" />Loading…</p></div>
+  }
+  if (plans.length === 0) return <div className="card"><p className="state">No plans yet.</p></div>
 
   return (
+    <div className="card flush table-wrap">
     <table className="plans">
       <thead>
         <tr>
@@ -30,15 +33,15 @@ export function PlanList({
                 <button type="button" className="link" onClick={() => onHistory(plan)}>{plan.name}</button>
               </td>
               <td>{String(plan.versionNo)}</td>
-              <td>{plan.status}</td>
+              <td><span className={`badge ${retired ? 'retired' : 'active'}`}>{plan.status}</span></td>
               <td>{plan.effectiveFrom}</td>
               <td className="num">{formatPercent(plan.discount)}</td>
               <td className="num">{plan.tiers.length}</td>
               <td>
                 {!retired && (
                   <div className="actions">
-                    <button type="button" onClick={() => onEdit(plan)}>Edit</button>
-                    <button type="button" onClick={() => onRetire(plan)}>Retire</button>
+                    <button type="button" className="small" onClick={() => onEdit(plan)}>Edit</button>
+                    <button type="button" className="small" onClick={() => onRetire(plan)}>Retire</button>
                   </div>
                 )}
               </td>
@@ -47,5 +50,6 @@ export function PlanList({
         })}
       </tbody>
     </table>
+    </div>
   )
 }
