@@ -224,6 +224,37 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_returns_the_original_result_after_a_newer_plan_version_arrives()
+    {
+        var (_, premium) = await SeedStandardAndPremium();
+        var created = await Post(Household(250m));
+        var postBody = await created.Content.ReadAsStringAsync();
+        await InsertPlan(premium, 2, "Premium", "Active", "2026-11-05", 0.10m, """[{"threshold":null,"pricePerKwh":0.99}]""");
+
+        var get = await factory.CreateClient().GetAsync(created.Headers.Location);
+
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        Assert.True(JsonElement.DeepEquals(
+            JsonDocument.Parse(postBody).RootElement,
+            JsonDocument.Parse(await get.Content.ReadAsStringAsync()).RootElement));
+    }
+
+    [Fact]
+    public async Task Stored_items_hold_only_the_ranking_without_breakdowns()
+    {
+        await SeedStandardAndPremium();
+        var id = await CreateRecommendation();
+
+        var items = (await InDb(db => db.PlanRecommendations.AsNoTracking().SingleAsync(r => r.Id == id))).Items;
+
+        Assert.DoesNotContain("breakdown", items, StringComparison.OrdinalIgnoreCase);
+        var array = JsonDocument.Parse(items).RootElement;
+        Assert.Equal(2, array.GetArrayLength());
+        Assert.All(array.EnumerateArray(), item =>
+            Assert.Equal(["name", "planId", "planVersionNo", "total"], item.EnumerateObject().Select(p => p.Name).Order().ToArray()));
+    }
+
+    [Fact]
     public async Task Unknown_id_is_not_found()
     {
         var response = await factory.CreateClient().GetAsync($"/recommendations/{Guid.NewGuid()}");

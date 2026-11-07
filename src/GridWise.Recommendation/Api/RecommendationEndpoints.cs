@@ -1,3 +1,4 @@
+using System.Globalization;
 using GridWise.Recommendation.Services;
 using Microsoft.AspNetCore.Mvc;
 using static GridWise.Recommendation.Api.EndpointHelpers;
@@ -48,6 +49,7 @@ public static class RecommendationEndpoints
         {
             case CalculateResult.Created created:
                 http.Response.Headers["X-Correlation-Id"] = correlationId;
+                http.Response.Headers["Server-Timing"] = ServerTiming(created.Timings);
                 return Results.Created($"/recommendations/{created.Recommendation.Id}", created.Recommendation);
 
             case CalculateResult.ValidationFailed failed:
@@ -59,6 +61,9 @@ public static class RecommendationEndpoints
                     title: "no plans available yet");
         }
     }
+
+    private static string ServerTiming(CalculationTimings t) => string.Create(CultureInfo.InvariantCulture,
+        $"db-read;dur={t.DbRead:F1}, calc;dur={t.Calc:F1}, json;dur={t.Json:F1}, save;dur={t.Save:F1}");
 
     private static async Task<IResult> AcceptPlan(
         Guid id,
