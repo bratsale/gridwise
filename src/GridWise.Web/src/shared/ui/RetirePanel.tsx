@@ -1,16 +1,15 @@
 import type { FormEvent } from 'react'
-import { useFormat, useMessageText, useT } from '../../../../shared/i18n/LanguageProvider.tsx'
-import type { Message } from '../../../../shared/i18n/message.ts'
-import { Banner } from '../../../../shared/ui/Banner.tsx'
-import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog.tsx'
-import { FieldErrors } from '../../../../shared/ui/FieldErrors.tsx'
-import type { Plan } from '../api/plansApi.ts'
+import { useFormat, useMessageText, useT } from '../i18n/LanguageProvider.tsx'
+import type { Message } from '../i18n/message.ts'
+import { Banner } from './Banner.tsx'
+import { ConfirmDialog } from './ConfirmDialog.tsx'
+import { FieldErrors } from './FieldErrors.tsx'
 
 export function RetirePanel({
-  plan, effectiveFrom, submitting, confirming, message, general, dateErrors,
+  name, effectiveFrom, submitting, confirming, message, general, dateErrors,
   onDate, onAsk, onConfirm, onCancelConfirm, onCancel,
 }: {
-  plan: Plan
+  name: string
   effectiveFrom: string
   submitting: boolean
   confirming: boolean
@@ -29,7 +28,7 @@ export function RetirePanel({
 
   return (
     <form className="panel" onSubmit={onAsk}>
-      <h3>{t('retire.title', { name: plan.name })}</h3>
+      <h3>{t('retire.title', { name })}</h3>
       <label>
         {t('retire.from')}
         <input type="date" required value={effectiveFrom} onChange={(e) => onDate(e.target.value)} />
@@ -43,7 +42,7 @@ export function RetirePanel({
       </div>
       <ConfirmDialog
         open={confirming}
-        message={t('retire.confirm', { name: plan.name, date: format.date(effectiveFrom) })}
+        message={t('retire.confirm', { name, date: format.date(effectiveFrom) })}
         confirmLabel={t('retire.confirmButton')}
         danger
         onConfirm={onConfirm}

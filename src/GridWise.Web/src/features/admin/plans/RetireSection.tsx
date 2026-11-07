@@ -1,16 +1,17 @@
-import { RetirePanel } from './components/RetirePanel.tsx'
+import type { Optimistic } from '../../../shared/hooks/useOptimisticList.ts'
+import { RetirePanel } from '../../../shared/ui/RetirePanel.tsx'
 import type { Plan } from './api/plansApi.ts'
 import { useRetire } from './hooks/useRetire.ts'
 import type { Notice } from './hooks/usePlans.ts'
 
 // Connects the retire state (hook) to the panel (presentation). Mounted once per plan.
 export function RetireSection({
-  plan, onDone, onCancel,
-}: { plan: Plan; onDone: (notice: Notice) => void; onCancel: () => void }) {
-  const r = useRetire(plan, onDone)
+  plan, optimistic, onDone, onCancel,
+}: { plan: Plan; optimistic: Optimistic<Plan>; onDone: (notice: Notice) => void; onCancel: () => void }) {
+  const r = useRetire(plan, optimistic, onDone)
   return (
     <RetirePanel
-      plan={plan}
+      name={plan.name}
       effectiveFrom={r.effectiveFrom}
       submitting={r.submitting}
       confirming={r.confirming}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { failureMessage } from '../../../../shared/api/failure.ts'
+import { useOptimisticList } from '../../../../shared/hooks/useOptimisticList.ts'
 import { msg, type Message } from '../../../../shared/i18n/message.ts'
 import { getPlan, listPlans, listVersions, type Plan } from '../api/plansApi.ts'
 import type { FormSession } from './usePlanForm.ts'
@@ -10,7 +11,7 @@ export type Notice =
   | { kind: 'retired'; date: string }
 
 export function usePlans() {
-  const [plans, setPlans] = useState<Plan[]>([])
+  const { items: plans, setItems: setPlans, pending, optimistic } = useOptimisticList<Plan>((plan) => plan.id)
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState<Message | null>(null)
   const [rowError, setRowError] = useState<Message | null>(null)
@@ -21,8 +22,9 @@ export function usePlans() {
   const [retiring, setRetiring] = useState<Plan | null>(null)
   const [history, setHistory] = useState<{ plan: Plan; versions: Plan[] | null } | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  // `silent` refreshes in the background: the list stays on screen instead of turning into a spinner.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     const response = await listPlans()
     if (response.ok) {
       setPlans(response.body)
@@ -31,7 +33,7 @@ export function usePlans() {
       setListError(failureMessage(response, msg('plans.loadError')))
     }
     setLoading(false)
-  }, [])
+  }, [setPlans])
 
   useEffect(() => {
     void load()
@@ -72,11 +74,11 @@ export function usePlans() {
     setRetiring(null)
     setHistory(null)
     setNotice(next)
-    void load()
+    void load(true)
   }
 
   return {
-    plans, loading, listError, rowError, notice, dismissNotice: () => setNotice(null),
+    plans, pending, optimistic, loading, listError, rowError, notice, dismissNotice: () => setNotice(null),
     form, openCreate: () => openForm({ mode: 'create' }), closeForm: () => setForm(null),
     retiring, openRetire: (plan: Plan) => { setForm(null); setRetiring(plan) }, closeRetire: () => setRetiring(null),
     history, load, edit, showHistory, changed,

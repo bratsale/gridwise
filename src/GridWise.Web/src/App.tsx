@@ -5,7 +5,7 @@ import { ThemeSwitcher } from './shared/theme/ThemeSwitcher.tsx'
 import { Loading } from './shared/ui/Loading.tsx'
 
 // Each page is its own chunk, loaded when its tab is first opened.
-const PlansPage = lazy(() => import('./features/admin/plans/PlansPage.tsx').then((m) => ({ default: m.PlansPage })))
+const AdminPage = lazy(() => import('./features/admin/AdminPage.tsx').then((m) => ({ default: m.AdminPage })))
 const CustomerPage = lazy(() => import('./features/customer/CustomerPage.tsx').then((m) => ({ default: m.CustomerPage })))
 
 type Tab = 'admin' | 'customer'
@@ -34,7 +34,7 @@ export default function App() {
           {t('tab.customer')}
         </button>
       </div>
-      <Suspense fallback={<Loading />}>{tab === 'admin' ? <PlansPage /> : <CustomerPage />}</Suspense>
+      <Suspense fallback={<Loading />}>{tab === 'admin' ? <AdminPage /> : <CustomerPage />}</Suspense>
     </div>
   )
 }

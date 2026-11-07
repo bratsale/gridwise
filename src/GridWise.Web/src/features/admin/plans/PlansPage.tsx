@@ -30,21 +30,22 @@ export function PlansPage() {
       {plans.notice && (
         <div className="notice" role="status">
           <Banner kind="success" onDismiss={plans.dismissNotice}>{noticeText(plans.notice)}.</Banner>
-          <Banner kind="info">{t('plans.notice.delay')}</Banner>
+          <Banner kind="info">{t('admin.notice.delay')}</Banner>
         </div>
       )}
       {plans.listError && <Banner kind="error">{text(plans.listError)}</Banner>}
       {plans.rowError && <Banner kind="error">{text(plans.rowError)}</Banner>}
 
       {plans.form && (
-        <PlanFormSection key={plans.form.key} session={plans.form.session} onSaved={plans.changed} onCancel={plans.closeForm} />
+        <PlanFormSection key={plans.form.key} session={plans.form.session} optimistic={plans.optimistic} onSaved={plans.changed} onCancel={plans.closeForm} />
       )}
       {plans.retiring && (
-        <RetireSection key={plans.retiring.id} plan={plans.retiring} onDone={plans.changed} onCancel={plans.closeRetire} />
+        <RetireSection key={plans.retiring.id} plan={plans.retiring} optimistic={plans.optimistic} onDone={plans.changed} onCancel={plans.closeRetire} />
       )}
 
       <PlanList
         plans={plans.plans}
+        pending={plans.pending}
         loading={plans.loading}
         onHistory={(plan) => void plans.showHistory(plan)}
         onEdit={(plan) => void plans.edit(plan)}

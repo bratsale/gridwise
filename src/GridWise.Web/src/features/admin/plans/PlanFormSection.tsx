@@ -1,12 +1,14 @@
+import type { Optimistic } from '../../../shared/hooks/useOptimisticList.ts'
+import type { Plan } from './api/plansApi.ts'
 import { PlanForm } from './components/PlanForm.tsx'
 import { usePlanForm, type FormSession } from './hooks/usePlanForm.ts'
 import type { Notice } from './hooks/usePlans.ts'
 
 // Connects the form state (hook) to the form (presentation). Mounted once per opening of the form.
 export function PlanFormSection({
-  session, onSaved, onCancel,
-}: { session: FormSession; onSaved: (notice: Notice) => void; onCancel: () => void }) {
-  const f = usePlanForm(session, onSaved)
+  session, optimistic, onSaved, onCancel,
+}: { session: FormSession; optimistic: Optimistic<Plan>; onSaved: (notice: Notice) => void; onCancel: () => void }) {
+  const f = usePlanForm(session, optimistic, onSaved)
   return (
     <PlanForm
       editing={f.editing}

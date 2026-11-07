@@ -3,6 +3,7 @@ import type { ProblemDetails } from '../../../../shared/api/client.ts'
 import { failureMessage } from '../../../../shared/api/failure.ts'
 import { errorsFor, generalMessages } from '../../../../shared/api/problems.ts'
 import { fractionToPercent, percentToFraction, todayUtc } from '../../../../shared/format.ts'
+import type { Optimistic } from '../../../../shared/hooks/useOptimisticList.ts'
 import { msg, type Message } from '../../../../shared/i18n/message.ts'
 import { addVersion, createPlan, getPlan, type Plan, type PlanRequest } from '../api/plansApi.ts'
 import { validatePlan, type TierRow } from '../validation.ts'
@@ -10,7 +11,7 @@ import type { Notice } from './usePlans.ts'
 
 export type FormSession = { mode: 'create' } | { mode: 'version'; plan: Plan; etag: string }
 
-export function usePlanForm(session: FormSession, onSaved: (notice: Notice) => void) {
+export function usePlanForm(session: FormSession, optimistic: Optimistic<Plan>, onSaved: (notice: Notice) => void) {
   const editing = session.mode === 'version' ? session.plan : null
 
   // One key per opening of the form: a retry after an error sends the same key.
@@ -74,10 +75,25 @@ export function usePlanForm(session: FormSession, onSaved: (notice: Notice) => v
       })),
     }
 
+    // The list shows the expected result at once; a failed request puts the list back as it was.
+    const expected: Plan = {
+      id: editing?.id ?? `pending-${idempotencyKey}`,
+      versionNo: editing ? Number(editing.versionNo) + 1 : 1,
+      name: body.name,
+      discount: body.discount,
+      status: 'Active',
+      effectiveFrom: body.effectiveFrom ?? effectiveFrom,
+      tiers: body.tiers,
+    }
+    const change = optimistic.begin(expected)
+
     const response = editing ? await addVersion(editing.id, body, etag) : await createPlan(body, idempotencyKey)
 
     submittingRef.current = false
     setSubmitting(false)
+
+    if (response.ok) change.commit(response.body)
+    else change.rollback()
 
     if (response.ok) {
       onSaved(editing ? { kind: 'versionSaved', version: String(response.body.versionNo) } : { kind: 'created' })
