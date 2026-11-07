@@ -77,6 +77,17 @@ services:
       kafka-init:
         condition: service_completed_successfully
 
+  web:
+    build:
+      context: src/GridWise.Web
+    ports:
+      - "5100:80"
+    depends_on:
+      catalog:
+        condition: service_healthy
+      recommendation:
+        condition: service_healthy
+
   kafka:
     image: apache/kafka:4.4.0
     environment:

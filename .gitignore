@@ -484,3 +484,5 @@ $RECYCLE.BIN/
 CLAUDE.md
 .claude/
 .mcp.json
+src/GridWise.Web/node_modules
+src/GridWise.Web/dist
