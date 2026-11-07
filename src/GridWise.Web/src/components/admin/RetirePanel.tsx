@@ -3,6 +3,7 @@ import { CONFLICT_MESSAGE, getPlan, retirePlan, type Plan } from '../../api/cata
 import type { ProblemDetails } from '../../api/client.ts'
 import { errorsFor, generalMessages } from '../../api/problems.ts'
 import { todayUtc } from '../../format.ts'
+import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { FieldErrors } from '../FieldErrors.tsx'
 
 export function RetirePanel({
@@ -12,12 +13,16 @@ export function RetirePanel({
   const [problem, setProblem] = useState<ProblemDetails | undefined>()
   const [message, setMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
-  async function retire(event: FormEvent) {
+  function ask(event: FormEvent) {
     event.preventDefault()
-    if (submitting) return
-    if (!window.confirm(`Retire "${plan.name}" from ${effectiveFrom}?`)) return
+    if (!submitting) setConfirming(true)
+  }
 
+  async function retire() {
+    setConfirming(false)
+    if (submitting) return
     setSubmitting(true)
     setProblem(undefined)
     setMessage(null)
@@ -48,7 +53,7 @@ export function RetirePanel({
   const general = generalMessages(problem, ['effectiveFrom'])
 
   return (
-    <form className="panel" onSubmit={(e) => void retire(e)}>
+    <form className="panel" onSubmit={ask}>
       <h3>Retire "{plan.name}"</h3>
       <label>
         Retired from (UTC)
@@ -61,6 +66,13 @@ export function RetirePanel({
         <button type="submit" disabled={submitting}>{submitting ? 'Retiring…' : 'Retire plan'}</button>
         <button type="button" onClick={onCancel}>Cancel</button>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        message={`Retire "${plan.name}" from ${effectiveFrom}?`}
+        confirmLabel="Retire"
+        onConfirm={() => void retire()}
+        onCancel={() => setConfirming(false)}
+      />
     </form>
   )
 }

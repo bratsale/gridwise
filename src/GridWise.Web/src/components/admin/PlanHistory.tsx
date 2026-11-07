@@ -2,6 +2,12 @@ import type { Plan } from '../../api/catalogApi.ts'
 import { formatKwh, formatPercent, formatPrice } from '../../format.ts'
 
 // versions is null while they are loading.
+// The latest version (highest number) tells whether the plan is retired, and from when.
+function retiredFrom(versions: Plan[]) {
+  const latest = versions.reduce((a, b) => (Number(b.versionNo) > Number(a.versionNo) ? b : a))
+  return latest.status === 'Retired' ? latest.effectiveFrom : null
+}
+
 export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] | null }) {
   return (
     <div className="panel">
@@ -11,6 +17,8 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
       ) : versions.length === 0 ? (
         <p>No versions.</p>
       ) : (
+        <>
+        {retiredFrom(versions) && <p><strong>Plan retired from {retiredFrom(versions)}</strong></p>}
         <table className="plans">
           <thead>
             <tr>
@@ -35,6 +43,7 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
             ))}
           </tbody>
         </table>
+        </>
       )}
     </div>
   )

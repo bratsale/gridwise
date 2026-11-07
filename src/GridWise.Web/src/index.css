@@ -204,3 +204,14 @@ tr.retired {
 .result:focus {
   outline: none;
 }
+
+dialog.confirm {
+  border: 1px solid #8884;
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 28rem;
+}
+
+dialog.confirm::backdrop {
+  background: #0006;
+}
