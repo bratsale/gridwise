@@ -1,4 +1,6 @@
 /* ---------- Design tokens ---------- */
+/* Light and dark values sit side by side in light-dark(). color-scheme picks the side:
+   "light dark" follows the system, data-theme on <html> (set by the switcher) forces one. */
 :root {
   color-scheme: light dark;
 
@@ -18,69 +20,43 @@
 
   --radius: 8px;
   --radius-sm: 6px;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
-  --shadow-lg: 0 12px 32px rgb(16 24 40 / 22%);
+  --shadow: light-dark(0 1px 2px rgb(16 24 40 / 6%), 0 1px 2px rgb(0 0 0 / 40%));
+  --shadow-lg: light-dark(0 12px 32px rgb(16 24 40 / 22%), 0 12px 32px rgb(0 0 0 / 60%));
 
-  --bg: #f3f5f8;
-  --surface: #ffffff;
-  --surface-2: #f6f8fb;
-  --border: #d9e0e8;
-  --border-strong: #b9c4d0;
-  --text: #18212b;
-  --muted: #566372;
+  --bg: light-dark(#f3f5f8, #0e1319);
+  --surface: light-dark(#ffffff, #161d25);
+  --surface-2: light-dark(#f6f8fb, #1b242e);
+  --border: light-dark(#d9e0e8, #2b3643);
+  --border-strong: light-dark(#b9c4d0, #425061);
+  --text: light-dark(#18212b, #e7ecf2);
+  --muted: light-dark(#566372, #9aa7b6);
 
-  --accent: #0b6bcb;
-  --accent-hover: #0958a8;
-  --accent-soft: #e5f0fc;
-  --on-accent: #ffffff;
+  --accent: light-dark(#0b6bcb, #5aa9ff);
+  --accent-hover: light-dark(#0958a8, #82bdff);
+  --accent-soft: light-dark(#e5f0fc, #14283f);
+  --on-accent: light-dark(#ffffff, #06182b);
 
-  --success: #17692f;
-  --success-soft: #e2f4e7;
-  --warning: #84570a;
-  --warning-soft: #fff2d1;
-  --danger: #b42318;
-  --danger-hover: #912018;
-  --danger-soft: #fdeceb;
-  --on-danger: #ffffff;
-  --info: #0b5cad;
-  --info-soft: #e5f0fc;
+  --success: light-dark(#17692f, #5fd37e);
+  --success-soft: light-dark(#e2f4e7, #12301e);
+  --warning: light-dark(#84570a, #f0b84a);
+  --warning-soft: light-dark(#fff2d1, #36290c);
+  --danger: light-dark(#b42318, #ff8077);
+  --danger-hover: light-dark(#912018, #ffa099);
+  --danger-soft: light-dark(#fdeceb, #3a1714);
+  --on-danger: light-dark(#ffffff, #2a0805);
+  --info: light-dark(#0b5cad, #7fbaff);
+  --info-soft: light-dark(#e5f0fc, #14283f);
 
-  --row-hover: #f0f5fb;
-  --focus: #0b6bcb;
+  --row-hover: light-dark(#f0f5fb, #1d2833);
+  --focus: light-dark(#0b6bcb, #82bdff);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow-lg: 0 12px 32px rgb(0 0 0 / 60%);
+:root[data-theme='light'] {
+  color-scheme: light;
+}
 
-    --bg: #0e1319;
-    --surface: #161d25;
-    --surface-2: #1b242e;
-    --border: #2b3643;
-    --border-strong: #425061;
-    --text: #e7ecf2;
-    --muted: #9aa7b6;
-
-    --accent: #5aa9ff;
-    --accent-hover: #82bdff;
-    --accent-soft: #14283f;
-    --on-accent: #06182b;
-
-    --success: #5fd37e;
-    --success-soft: #12301e;
-    --warning: #f0b84a;
-    --warning-soft: #36290c;
-    --danger: #ff8077;
-    --danger-hover: #ffa099;
-    --danger-soft: #3a1714;
-    --on-danger: #2a0805;
-    --info: #7fbaff;
-    --info-soft: #14283f;
-
-    --row-hover: #1d2833;
-    --focus: #82bdff;
-  }
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 /* ---------- Base ---------- */
@@ -115,7 +91,50 @@ h1, h2, h3 {
 }
 
 .app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
+}
+
+.switchers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.segmented button {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.segmented button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .app-header h1 {

@@ -1,17 +1,10 @@
-import type { components } from './catalog.ts'
-import { request, type ApiResponse, type RequestOptions } from './client.ts'
+import type { components } from '../../../../shared/api/catalog.ts'
+import { safeRequest } from '../../../../shared/api/client.ts'
 
 export type Plan = components['schemas']['PlanResponse']
 export type PlanRequest = components['schemas']['CreatePlanRequest']
 
-// Like request(), but a network failure or a non-JSON answer becomes a ProblemDetails instead of an exception.
-async function call<T>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
-  try {
-    return await request<T>('catalog', path, options)
-  } catch {
-    return { ok: false, status: 0, headers: new Headers(), body: { title: 'The service could not be reached.' } }
-  }
-}
+const call = <T>(path: string, options?: Parameters<typeof safeRequest>[2]) => safeRequest<T>('catalog', path, options)
 
 export const listPlans = () => call<Plan[]>('/plans?includeRetired=true')
 
@@ -27,6 +20,3 @@ export const addVersion = (id: string, body: PlanRequest, etag: string) =>
 
 export const retirePlan = (id: string, effectiveFrom: string, etag: string) =>
   call<undefined>(`/plans/${id}?effectiveFrom=${effectiveFrom}`, { method: 'DELETE', headers: { 'If-Match': etag } })
-
-export const CONFLICT_MESSAGE =
-  'This plan was changed by someone else (or retired). Reload it and apply your change again.'

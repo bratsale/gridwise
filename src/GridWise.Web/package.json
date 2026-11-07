@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "gen:api": "openapi-typescript http://localhost:5101/openapi/v1.json -o src/api/catalog.ts && openapi-typescript http://localhost:5102/openapi/v1.json -o src/api/recommendation.ts"
+    "gen:api": "openapi-typescript http://localhost:5101/openapi/v1.json -o src/shared/api/catalog.ts && openapi-typescript http://localhost:5102/openapi/v1.json -o src/shared/api/recommendation.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

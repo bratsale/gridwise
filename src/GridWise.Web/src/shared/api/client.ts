@@ -52,3 +52,12 @@ export async function request<T>(
     ? { ok: true, status: response.status, headers: response.headers, body: parsed as T }
     : { ok: false, status: response.status, headers: response.headers, body: parsed as ProblemDetails | undefined }
 }
+
+// Like request(), but a network failure or a non-JSON answer becomes a response with status 0 instead of an exception.
+export async function safeRequest<T>(service: Service, path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  try {
+    return await request<T>(service, path, options)
+  } catch {
+    return { ok: false, status: 0, headers: new Headers(), body: undefined }
+  }
+}

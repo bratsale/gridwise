@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GridWise</title>
+    <script>
+      // Apply the saved theme before the page paints, so there is no flash of the wrong theme.
+      try {
+        var theme = localStorage.getItem('gridwise.theme')
+        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
