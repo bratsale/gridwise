@@ -64,15 +64,13 @@ public class BatchDispatcher(
     {
         var work = 0;
 
-        var pendingJobs = await db.Jobs
+        var pendingJobIds = await db.Jobs
             .Where(j => j.Status == JobStatus.Pending)
             .OrderBy(j => j.CreatedAt).ThenBy(j => j.Id)
+            .Select(j => j.Id)
             .ToListAsync(ct);
-        foreach (var job in pendingJobs)
-        {
-            await SplitIntoChunksAsync(db, job, time, chunkSize, ct);
-            work++;
-        }
+        foreach (var jobId in pendingJobIds)
+            work += await SplitIntoChunksAsync(db, jobId, time, chunkSize, ct);
 
         var runningJobIds = await db.Jobs
             .Where(j => j.Status == JobStatus.Running)
@@ -80,42 +78,56 @@ public class BatchDispatcher(
             .Select(j => j.Id)
             .ToListAsync(ct);
         foreach (var jobId in runningJobIds)
-            work += await DispatchAsync(db, jobId, time, windowSize, ct);
+            work += await DispatchJobAsync(db, jobId, time, windowSize, ct);
 
         return work;
     }
 
-    // One transaction: all chunk rows and the job turning Running.
-    private static async Task SplitIntoChunksAsync(
-        BatchDbContext db, Job job, TimeProvider time, int chunkSize, CancellationToken ct)
+    // One transaction: all chunk rows and the job turning Running. The job row is locked and its status checked again,
+    // so a cancel and the split cannot interleave.
+    private static async Task<int> SplitIntoChunksAsync(
+        BatchDbContext db, Guid jobId, TimeProvider time, int chunkSize, CancellationToken ct)
     {
-        var content = await ReadFileAsync(db, job.Id, ct);
+        var content = await ReadFileAsync(db, jobId, ct);
 
-        var chunks = new List<Chunk>();
-        Chunk? current = null;
-        foreach (var (line, _) in CsvRows.Read(content))
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            if (current is null || current.RowCount == chunkSize)
-            {
-                current = new Chunk
-                {
-                    JobId = job.Id,
-                    ChunkNo = chunks.Count + 1,
-                    FirstLine = line,
-                    Status = ChunkStatus.Pending
-                };
-                chunks.Add(current);
-            }
-            current.RowCount++;
-        }
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        db.Chunks.AddRange(chunks);
-        job.Status = JobStatus.Running;
-        job.StartedAt = time.GetUtcNow();
-        await db.SaveChangesAsync(ct);
+            if (await JobLock.LockAsync(db, jobId, ct) != JobStatus.Pending)
+                return 0;
+
+            var chunks = new List<Chunk>();
+            Chunk? current = null;
+            foreach (var (line, _) in CsvRows.Read(content))
+            {
+                if (current is null || current.RowCount == chunkSize)
+                {
+                    current = new Chunk
+                    {
+                        JobId = jobId,
+                        ChunkNo = chunks.Count + 1,
+                        FirstLine = line,
+                        Status = ChunkStatus.Pending
+                    };
+                    chunks.Add(current);
+                }
+                current.RowCount++;
+            }
+
+            db.Chunks.AddRange(chunks);
+            await db.SaveChangesAsync(ct);
+            var now = time.GetUtcNow();
+            await db.Jobs.Where(j => j.Id == jobId)
+                .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatus.Running).SetProperty(j => j.StartedAt, now), ct);
+            await transaction.CommitAsync(ct);
+            return 1;
+        });
     }
 
-    private static async Task<int> DispatchAsync(
+    /// <summary>Dispatches the next Pending chunks of a Running job while fewer than <paramref name="windowSize"/> are in flight.</summary>
+    public static async Task<int> DispatchJobAsync(
         BatchDbContext db, Guid jobId, TimeProvider time, int windowSize, CancellationToken ct)
     {
         var inFlight = await db.Chunks.CountAsync(c => c.JobId == jobId && c.Status == ChunkStatus.Dispatched, ct);
@@ -123,7 +135,7 @@ public class BatchDispatcher(
         if (free <= 0)
             return 0;
 
-        var next = await db.Chunks
+        var next = await db.Chunks.AsNoTracking()
             .Where(c => c.JobId == jobId && c.Status == ChunkStatus.Pending)
             .OrderBy(c => c.ChunkNo)
             .Take(free)
@@ -136,6 +148,7 @@ public class BatchDispatcher(
         using var rows = CsvRows.Read(content).GetEnumerator();
         var hasRow = rows.MoveNext();
 
+        var dispatched = 0;
         foreach (var chunk in next)
         {
             while (hasRow && rows.Current.Line < chunk.FirstLine)
@@ -147,24 +160,46 @@ public class BatchDispatcher(
                 chunkRows.Add(new ChunkRowV1(rows.Current.Line, rows.Current.Text));
                 hasRow = rows.MoveNext();
             }
+            var payload = JsonSerializer.Serialize(new BatchChunkRequestedV1(jobId, chunk.ChunkNo, chunkRows), Json);
 
-            var now = time.GetUtcNow();
-            chunk.Status = ChunkStatus.Dispatched;
-            chunk.DispatchedAt = now;
-            db.OutboxMessages.Add(new OutboxMessage
+            // One transaction per chunk: Dispatched and its outbox row. The job row is locked and its status checked again,
+            // so a cancel and a dispatch cannot interleave: after the cancel commits, nothing more is dispatched.
+            var done = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
-                Id = Guid.CreateVersion7(),
-                AggregateType = "batch-chunk",
-                AggregateId = $"{jobId}:{chunk.ChunkNo}", // the Kafka key: spreads the chunks of a job over all partitions
-                EventType = EventTypes.BatchChunkRequested,
-                EventVersion = 1,
-                Payload = JsonSerializer.Serialize(new BatchChunkRequestedV1(jobId, chunk.ChunkNo, chunkRows), Json),
-                OccurredAt = now
+                db.ChangeTracker.Clear();
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+                if (await JobLock.LockAsync(db, jobId, ct) != JobStatus.Running)
+                    return false;
+
+                var now = time.GetUtcNow();
+                var updated = await db.Chunks
+                    .Where(c => c.JobId == jobId && c.ChunkNo == chunk.ChunkNo && c.Status == ChunkStatus.Pending)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ChunkStatus.Dispatched).SetProperty(c => c.DispatchedAt, now), ct);
+                if (updated == 0)
+                    return true; // not Pending any more: nothing to send for this chunk
+
+                db.OutboxMessages.Add(new OutboxMessage
+                {
+                    Id = Guid.CreateVersion7(),
+                    AggregateType = "batch-chunk",
+                    AggregateId = $"{jobId}:{chunk.ChunkNo}", // the Kafka key: spreads the chunks of a job over all partitions
+                    EventType = EventTypes.BatchChunkRequested,
+                    EventVersion = 1,
+                    Payload = payload,
+                    OccurredAt = now
+                });
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                dispatched++;
+                return true;
             });
-            await db.SaveChangesAsync(ct); // one transaction per chunk: Dispatched and its outbox row
+
+            if (!done)
+                break; // the job is not Running any more
         }
 
-        return next.Count;
+        return dispatched;
     }
 
     private static Task<byte[]> ReadFileAsync(BatchDbContext db, Guid jobId, CancellationToken ct)

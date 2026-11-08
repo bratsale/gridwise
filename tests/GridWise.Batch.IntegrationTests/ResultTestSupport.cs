@@ -35,7 +35,7 @@ internal class ResultTestSupport(BatchFactory factory)
     }
 
     // Result lines are numbered from `firstLine`; error lines follow the results.
-    public static string Completed(Guid jobId, int chunkNo, int results, int errors, int firstLine = 2, string type = "BatchChunkCompleted", int version = 1)
+    public static string Completed(Guid jobId, int chunkNo, int results, int errors, int firstLine = 2, string type = "BatchChunkCompleted", int version = 1, string planName = "Standard")
         => JsonSerializer.Serialize(new
         {
             id = Guid.NewGuid(),
@@ -50,7 +50,7 @@ internal class ResultTestSupport(BatchFactory factory)
                 results = Enumerable.Range(0, results).Select(i => new
                 {
                     line = firstLine + i, customerId = $"c{firstLine + i}", planId = Guid.Parse("5eed0000-0000-0000-0000-000000000001"),
-                    planVersionNo = 1, planName = "Standard", total = 24.10m, taxGroupVersionNo = 1
+                    planVersionNo = 1, planName, total = 24.10m, taxGroupVersionNo = 1
                 }),
                 errors = Enumerable.Range(0, errors).Select(i => new { line = firstLine + results + i, error = "consumption_kwh 'abc' is not a number." })
             }

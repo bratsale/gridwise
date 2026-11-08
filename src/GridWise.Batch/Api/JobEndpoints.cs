@@ -32,6 +32,8 @@ public static class JobEndpoints
             .WithTags("Jobs")
             .Produces<List<JobResponse>>();
 
+        app.MapJobActionEndpoints();
+
         return app;
     }
 
@@ -100,7 +102,7 @@ public static class JobEndpoints
         return Results.Ok(jobs.Select(j => ToResponse(j, counts)));
     }
 
-    private static async Task<Dictionary<Guid, (int Total, int Completed)>> ChunkCountsAsync(
+    internal static async Task<Dictionary<Guid, (int Total, int Completed)>> ChunkCountsAsync(
         BatchDbContext db, List<Guid> jobIds, CancellationToken ct)
     {
         var rows = await db.Chunks.AsNoTracking()
@@ -112,7 +114,7 @@ public static class JobEndpoints
         return rows.ToDictionary(r => r.JobId, r => (r.Total, r.Completed));
     }
 
-    private static JobResponse ToResponse(Job job, Dictionary<Guid, (int Total, int Completed)> counts)
+    internal static JobResponse ToResponse(Job job, Dictionary<Guid, (int Total, int Completed)> counts)
         => counts.TryGetValue(job.Id, out var c) ? JobResponse.From(job, c.Total, c.Completed) : JobResponse.From(job, 0, 0);
 
     private static IResult Rejected(int status, string title) => Results.Problem(statusCode: status, title: title);
