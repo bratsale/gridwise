@@ -1,4 +1,3 @@
-using System.Text;
 using Confluent.Kafka;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Events;
@@ -13,7 +12,7 @@ public class CatalogConsumer(
 {
     private const int MaxAttempts = 3;
     private static readonly TimeSpan DatabaseWait = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan ErrorWait = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan ErrorWait = TimeSpan.FromSeconds(5);
 
     public readonly record struct FailureDecision(bool DeadLetter, TimeSpan Wait);
 
@@ -22,12 +21,16 @@ public class CatalogConsumer(
     {
         if (ex is PoisonMessageException)
             return new(true, TimeSpan.Zero);
-        if (ex is (NpgsqlException and not PostgresException) or RetryLimitExceededException)
+        if (IsTemporary(ex))
             return new(false, DatabaseWait);
         return failures >= MaxAttempts
             ? new(true, TimeSpan.Zero)
             : new(false, TimeSpan.FromSeconds(failures));
     }
+
+    // Not the message's fault, so it is retried without counting: the database is down, or the data it needs has not arrived yet.
+    public static bool IsTemporary(Exception ex)
+        => ex is (NpgsqlException and not PostgresException) or RetryLimitExceededException or TemporarilyUnavailableException;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -81,77 +84,16 @@ public class CatalogConsumer(
         }
     }
 
-    private async Task ProcessAsync(
+    private Task ProcessAsync(
         IConsumer<string, string> consumer, IProducer<string, string> producer,
         ConsumeResult<string, string> message, CancellationToken ct)
-    {
-        var failures = 0;
-        while (true)
+        => MessageProcessing.ProcessAsync(consumer, producer, message, async token =>
         {
-            try
-            {
-                using var scope = scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<RecommendationDbContext>();
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RecommendationDbContext>();
 
-                var outcome = await handler.HandleAsync(db, message.Message.Value, ct);
-                logger.LogDebug("Message {Topic}[{Partition}]@{Offset}: {Outcome}",
-                    message.Topic, message.Partition.Value, message.Offset.Value, outcome);
-
-                consumer.Commit(message);
-                return;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                var databaseDown = ex is (NpgsqlException and not PostgresException) or RetryLimitExceededException;
-                if (!databaseDown)
-                    failures++;
-
-                var decision = Decide(ex, failures);
-                if (decision.DeadLetter)
-                {
-                    logger.LogError(ex, "Message {Topic}[{Partition}]@{Offset} goes to the dead-letter topic.",
-                        message.Topic, message.Partition.Value, message.Offset.Value);
-                    await DeadLetterAsync(producer, message, ex, ct);
-                    consumer.Commit(message);
-                    return;
-                }
-
-                logger.LogWarning(ex, "Message {Topic}[{Partition}]@{Offset} failed; retrying in {Wait}.",
-                    message.Topic, message.Partition.Value, message.Offset.Value, decision.Wait);
-                await Task.Delay(decision.Wait, time, ct);
-            }
-        }
-    }
-
-    // The offset is committed only after this succeeds, so keep trying while Kafka is unavailable.
-    private async Task DeadLetterAsync(
-        IProducer<string, string> producer, ConsumeResult<string, string> message, Exception error, CancellationToken ct)
-    {
-        var dead = new Message<string, string>
-        {
-            Key = message.Message.Key,
-            Value = message.Message.Value,
-            Headers =
-            [
-                new Header("source-topic", Encoding.UTF8.GetBytes(message.Topic)),
-                new Header("source-partition", Encoding.UTF8.GetBytes(message.Partition.Value.ToString())),
-                new Header("source-offset", Encoding.UTF8.GetBytes(message.Offset.Value.ToString())),
-                new Header("error", Encoding.UTF8.GetBytes(error.Message))
-            ]
-        };
-
-        while (true)
-        {
-            try
-            {
-                await producer.ProduceAsync(Topics.RecommendationDlq, dead, ct);
-                return;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex, "Publishing to {Topic} failed; retrying.", Topics.RecommendationDlq);
-                await Task.Delay(ErrorWait, time, ct);
-            }
-        }
-    }
+            var outcome = await handler.HandleAsync(db, message.Message.Value, token);
+            logger.LogDebug("Message {Topic}[{Partition}]@{Offset}: {Outcome}",
+                message.Topic, message.Partition.Value, message.Offset.Value, outcome);
+        }, time, logger, ct);
 }

@@ -21,9 +21,8 @@ public class DlqReprocessorTests(RecommendationFactory factory, KafkaFixture kaf
 
         using var producer = new ProducerBuilder<string, string>(new ProducerConfig { BootstrapServers = kafka.BootstrapServers }).Build();
         await producer.ProduceAsync(Topics.RecommendationDlq,
-            new Message<string, string> { Key = validPlan.ToString(), Value = CatalogEventHandlerTests.PlanEnvelope(validPlan) });
-        await producer.ProduceAsync(Topics.RecommendationDlq,
-            new Message<string, string> { Key = badPlan.ToString(), Value = badJson });
+            Dead(validPlan.ToString(), CatalogEventHandlerTests.PlanEnvelope(validPlan), Topics.CatalogPlanEvents));
+        await producer.ProduceAsync(Topics.RecommendationDlq, Dead(badPlan.ToString(), badJson, Topics.CatalogPlanEvents));
 
         var first = await Run(producer);
         Assert.Equal(new DlqResult(1, 1), first);
@@ -46,11 +45,20 @@ public class DlqReprocessorTests(RecommendationFactory factory, KafkaFixture kaf
         Assert.Equal("2", Header(after[^1], "attempt"));
     }
 
-    private Task<DlqResult> Run(IProducer<string, string> producer)
+    // A message as the consumers put it in the DLQ: same key and value, with the source-topic header (null = header missing).
+    internal static Message<string, string> Dead(string key, string value, string? sourceTopic)
+    {
+        var headers = new Headers();
+        if (sourceTopic is not null)
+            headers.Add("source-topic", Encoding.UTF8.GetBytes(sourceTopic));
+        return new Message<string, string> { Key = key, Value = value, Headers = headers };
+    }
+
+    private async Task<DlqResult> Run(IProducer<string, string> producer)
     {
         using var scope = factory.Services.CreateScope();
         var options = scope.ServiceProvider.GetRequiredService<DbContextOptions<RecommendationDbContext>>();
-        return DlqReprocessor.RunAsync(
+        return await DlqReprocessor.RunAsync(
             () => new RecommendationDbContext(options),
             new ConsumerConfig { BootstrapServers = kafka.BootstrapServers }, producer, NullLogger.Instance,
             new CancellationTokenSource(TimeSpan.FromSeconds(60)).Token);

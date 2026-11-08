@@ -21,7 +21,6 @@ public static class DlqReprocessor
         consumerConfig.EnableAutoCommit = false;
         consumerConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
 
-        var handler = new CatalogEventHandler(TimeProvider.System);
         var reprocessed = 0;
         var failedAgain = 0;
 
@@ -58,7 +57,7 @@ public static class DlqReprocessor
                         try
                         {
                             using var db = createDb();
-                            var outcome = await handler.HandleAsync(db, message.Message.Value, ct);
+                            var outcome = await HandleAsync(db, SourceTopic(message), message.Message.Value, ct);
                             logger.LogInformation("DLQ message {Partition}@{Offset}: {Outcome}",
                                 message.Partition.Value, message.Offset.Value, outcome);
                             reprocessed++;
@@ -89,6 +88,25 @@ public static class DlqReprocessor
 
         return new DlqResult(reprocessed, failedAgain);
     }
+
+    // The message goes back to the handler of the topic it came from: the same code, and for a chunk the same transaction and dedup, as the live consumer.
+    private static async Task<string> HandleAsync(RecommendationDbContext db, string? sourceTopic, string value, CancellationToken ct)
+    {
+        if (sourceTopic is not null && sourceTopic.StartsWith("catalog.", StringComparison.Ordinal))
+            return (await new CatalogEventHandler(TimeProvider.System).HandleAsync(db, value, ct)).ToString();
+
+        if (sourceTopic == Topics.BatchChunks)
+            return (await new BatchChunkProcessor(db, new PlanRanker(db), TimeProvider.System).HandleAsync(value, ct)).ToString();
+
+        // Never skipped silently: it fails again and goes back to the end of the topic.
+        throw new InvalidOperationException(
+            $"Cannot reprocess a message from {(sourceTopic is null ? "an unknown source (no source-topic header)" : $"topic '{sourceTopic}'")}.");
+    }
+
+    private static string? SourceTopic(ConsumeResult<string, string> message)
+        => message.Message.Headers is { } headers && headers.TryGetLastBytes("source-topic", out var bytes)
+            ? Encoding.UTF8.GetString(bytes)
+            : null;
 
     private static Message<string, string> Requeue(ConsumeResult<string, string> message, Exception error)
     {

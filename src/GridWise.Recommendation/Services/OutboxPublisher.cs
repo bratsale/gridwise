@@ -75,6 +75,7 @@ public class OutboxPublisher(
             var topic = row.AggregateType switch
             {
                 "recommendation" => Topics.RecommendationEvents,
+                "batch-chunk-result" => Topics.BatchResults,
                 _ => null
             };
             if (topic is null)

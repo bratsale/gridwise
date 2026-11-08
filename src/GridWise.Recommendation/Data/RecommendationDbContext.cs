@@ -9,6 +9,7 @@ public class RecommendationDbContext(DbContextOptions<RecommendationDbContext> o
     public DbSet<TaxGroupVersionCopy> TaxGroupVersions => Set<TaxGroupVersionCopy>();
     public DbSet<PlanRecommendation> PlanRecommendations => Set<PlanRecommendation>();
     public DbSet<Acceptance> Acceptances => Set<Acceptance>();
+    public DbSet<ProcessedChunk> ProcessedChunks => Set<ProcessedChunk>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

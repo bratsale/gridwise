@@ -182,6 +182,26 @@ namespace GridWise.Recommendation.Migrations
                     b.ToTable("plan_versions", (string)null);
                 });
 
+            modelBuilder.Entity("GridWise.Recommendation.Domain.ProcessedChunk", b =>
+                {
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<int>("ChunkNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("chunk_no");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.HasKey("JobId", "ChunkNo")
+                        .HasName("pk_processed_chunks");
+
+                    b.ToTable("processed_chunks", (string)null);
+                });
+
             modelBuilder.Entity("GridWise.Recommendation.Domain.TaxGroupVersionCopy", b =>
                 {
                     b.Property<string>("Code")

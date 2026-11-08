@@ -36,10 +36,8 @@ public abstract record AcceptResult
     public sealed record Conflict : AcceptResult;
 }
 
-public class RecommendationService(RecommendationDbContext db, TimeProvider time)
+public class RecommendationService(RecommendationDbContext db, PlanRanker ranker, TimeProvider time)
 {
-    private const string Retired = "Retired";
-
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public async Task<CalculateResult> CalculateAsync(
@@ -61,41 +59,21 @@ public class RecommendationService(RecommendationDbContext db, TimeProvider time
         }
         double dbRead = 0, calc, json = 0, save;
 
-        var taxGroup = await db.TaxGroupVersions.AsNoTracking()
-            .Where(v => v.Code == req.TaxGroup && v.EffectiveFrom <= today)
-            .OrderByDescending(v => v.EffectiveFrom).ThenByDescending(v => v.VersionNo)
-            .FirstOrDefaultAsync(ct);
+        var taxGroup = await ranker.FindTaxGroupAsync(req.TaxGroup, today, ct);
         dbRead += Lap();
 
-        if (taxGroup is null || taxGroup.Status == Retired)
+        if (taxGroup is null || taxGroup.Status == PlanRanker.Retired)
             return new CalculateResult.ValidationFailed(new() { ["taxGroup"] = ["Unknown or retired tax group."] });
 
-        // Pick the version valid today for every plan first, then drop the retired ones.
-        var selected = await db.PlanVersions
-            .FromSqlInterpolated($"""
-                SELECT DISTINCT ON (plan_id) * FROM plan_versions
-                WHERE effective_from <= {today}
-                ORDER BY plan_id, effective_from DESC, version_no DESC
-                """)
-            .AsNoTracking()
-            .ToListAsync(ct);
+        var active = await ranker.GetActivePlansAsync(today, ct);
         dbRead += Lap();
 
-        var active = selected.Where(v => v.Status != Retired).ToList();
         if (active.Count == 0)
             return new CalculateResult.NoPlansAvailable();
 
-        var byId = active.ToDictionary(v => $"{v.PlanId}:{v.VersionNo}");
-        var plans = byId.Select(p => new PricingPlan(
-            p.Value.Name, ToTiers(p.Value.Tiers), p.Value.Discount, p.Key)).ToList();
-
-        var ranked = Recommender.Rank(plans, new TaxGroup(taxGroup.Vat, taxGroup.EcoTax), kwh);
-
-        var items = ranked.Select(q =>
-        {
-            var version = byId[q.Plan.Id];
-            return new PlanQuoteResponse(version.PlanId, version.VersionNo, q.Plan.Name, q.Breakdown.Total, ToResponse(q.Breakdown));
-        }).ToList();
+        var items = PlanRanker.Rank(active, taxGroup, kwh)
+            .Select(q => new PlanQuoteResponse(q.Version.PlanId, q.Version.VersionNo, q.Version.Name, q.Breakdown.Total, ToResponse(q.Breakdown)))
+            .ToList();
 
         calc = Lap();
 
@@ -261,7 +239,7 @@ public class RecommendationService(RecommendationDbContext db, TimeProvider time
                 return new PlanQuoteResponse(i.PlanId, i.PlanVersionNo, i.Name, i.Total, i.Breakdown);
 
             var v = versions[(i.PlanId, i.PlanVersionNo)];
-            var breakdown = PriceCalculator.Calculate(new PricingPlan(v.Name, ToTiers(v.Tiers), v.Discount), group, kwh);
+            var breakdown = PriceCalculator.Calculate(new PricingPlan(v.Name, PlanRanker.ToTiers(v.Tiers), v.Discount), group, kwh);
             return new PlanQuoteResponse(i.PlanId, i.PlanVersionNo, i.Name, i.Total, ToResponse(breakdown));
         }).ToList();
     }
@@ -278,10 +256,6 @@ public class RecommendationService(RecommendationDbContext db, TimeProvider time
 
     private static AcceptanceResponse ToResponse(Guid recommendationId, StoredQuote item, DateTimeOffset acceptedAt)
         => new(recommendationId, item.PlanId, item.PlanVersionNo, item.Total, acceptedAt);
-
-    private static List<PricingTier> ToTiers(string json)
-        => JsonSerializer.Deserialize<List<PlanTierV1>>(json, Json)!
-            .Select(t => new PricingTier(t.Threshold, t.PricePerKwh)).ToList();
 
     private static BreakdownResponse ToResponse(PriceBreakdown b)
         => new(

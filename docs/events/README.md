@@ -109,17 +109,44 @@ Owned by GridWise.Batch; it uses the same envelope as above.
 | rows[].line | int | Line number in the original file (1-based, the header is line 1, blank lines are skipped but counted) |
 | rows[].text | string | The raw CSV line, at most 200 characters (Batch rejects longer lines at upload). Batch does not parse or validate it: the worker does, row by row |
 
-## batch.results
+## BatchChunkCompleted (v1)
 
-- Topic: `batch.results` (3 partitions, retention unlimited)
-- Key: job id
-- Producer: the batch workers, through their outbox (not built yet)
+Owned by GridWise.Recommendation; it uses the same envelope as above. Batch reads it.
+
+- Topic: `batch.results` (3 partitions, retention unlimited like `recommendation.events`)
+- Key: job id (`jobId`)
+- Producer: the batch workers (GridWise.Recommendation started with `worker`), through the outbox of the recommendation database: one event for every `BatchChunkRequested` they process. The recommendation service publishes the outbox.
 - Consumer: GridWise.Batch, which records the result of a chunk and computes the progress (not built yet)
-- Format: the result event is defined in the step that builds the worker. The topic exists so that the compose stack is complete.
+- Sample: [BatchChunkCompleted.v1.json](BatchChunkCompleted.v1.json)
+
+The event is written once for a chunk: a repeated `BatchChunkRequested` (same `jobId` and `chunkNo`) is ignored by the worker, so there is at most one `BatchChunkCompleted` per chunk. Use (`jobId`, `chunkNo`) to deduplicate anyway.
+
+| Field | Type | Meaning |
+|---|---|---|
+| jobId | guid | Id of the batch job |
+| chunkNo | int | Number of the chunk inside the job |
+| results | array | One entry for every valid row, in file order |
+| results[].line | int | Line number in the original file |
+| results[].customerId | string | Customer id from the row (trimmed, at most 100 characters) |
+| results[].planId | guid | Cheapest plan for the row |
+| results[].planVersionNo | int | Version of that plan that was priced (the one valid on the day of processing) |
+| results[].planName | string | Name of the plan |
+| results[].total | decimal | Total price of the plan for the row's consumption (same as `POST /recommendations`) |
+| results[].taxGroupVersionNo | int | Version of the tax group that was used |
+| errors | array | One entry for every invalid row, in file order. Invalid rows do not stop the chunk |
+| errors[].line | int | Line number in the original file |
+| errors[].error | string | Why the row was rejected |
+
+A row is valid when it has exactly 3 comma-separated fields (no quoting, each trimmed) and:
+`customer_id` is not empty and at most 100 characters; `consumption_kwh` is a decimal (invariant culture, `.` as separator),
+not negative, with at most 3 decimal places; `tax_group` is the code of a tax group that is known and not retired today.
+`results` and `errors` together contain every row of the chunk exactly once.
+
+If the worker has no active plans yet, it writes nothing and retries the chunk later.
 
 ## Dead-letter topic
 
-`recommendation.dlq` holds messages that GridWise.Recommendation could not process:
+`recommendation.dlq` holds messages that GridWise.Recommendation could not process, from the catalog topics (read by the consumer) and from `batch.chunks` (read by the batch workers):
 
 - a poison message (not valid JSON, not an envelope, data that cannot be read)
 - an unknown version of a known event type
@@ -129,7 +156,7 @@ The key and value are copied unchanged. Headers:
 
 | Header | Meaning |
 |---|---|
-| source-topic, source-partition, source-offset | Where the message came from |
+| source-topic, source-partition, source-offset | Where the message came from. `source-topic` also decides who handles the message when it is reprocessed |
 | error | Why it failed (the last error) |
 | attempt | Set by the reprocess command: how many times reprocessing has failed so far (absent = never reprocessed) |
 
@@ -147,7 +174,16 @@ Reprocess it, after the cause is fixed (for example the consumer is updated to t
 docker compose run --rm recommendation reprocess-dlq
 ```
 
-The command handles the messages that are in the topic when it starts, with the same handler as the consumer, then exits.
+The command handles the messages that are in the topic when it starts, then exits. Each message goes to the handler of its `source-topic`,
+the same code as the live consumer:
+
+| source-topic | Handled by |
+|---|---|
+| `catalog.plan-events`, `catalog.tax-group-events` (any `catalog.*`) | the catalog event handler (copy of plan and tax group versions) |
+| `batch.chunks` | the batch chunk processor: one transaction with the `processed_chunks` check (a chunk already processed is a duplicate), the pricing and the `BatchChunkCompleted` outbox row |
+| anything else, or no `source-topic` header | not handled: it fails again (see below), it is never skipped silently |
+
+A chunk is reprocessed with today's plans and tax groups, like a chunk processed late by a worker.
 It prints how many were reprocessed and how many failed again. Exit code 0 means nothing failed again, 1 means some did.
 A message that fails again is written to the end of `recommendation.dlq` with `attempt` + 1 and the new error, so it is not handled twice in one run.
 Run it again later. Handling is idempotent, so running it twice is safe.

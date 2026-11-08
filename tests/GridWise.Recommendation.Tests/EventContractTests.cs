@@ -120,6 +120,44 @@ public class EventContractTests
         }
     }
 
+    // Consumed: the contract is owned by Batch.
+    [Fact]
+    public void BatchChunkRequested_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<BatchChunkRequestedV1>(Golden("BatchChunkRequested.v1.json"), Web)!;
+
+        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-0000000000b1"), e.JobId);
+        Assert.Equal(1, e.ChunkNo);
+        Assert.Equal([new ChunkRowV1(2, "c1,250.5,household"), new ChunkRowV1(4, "c2,80,household")], e.Rows);
+    }
+
+    // Produced: Batch reads it, so the serialized form must not drift from the golden file.
+    private static readonly BatchChunkCompletedV1 Completed = new(
+        Guid.Parse("5eed0000-0000-0000-0000-0000000000b1"), 1,
+        [new RowResultV1(2, "c1", Guid.Parse("5eed0000-0000-0000-0000-000000000001"), 1, "Standard", 24.10m, 1)],
+        [new RowErrorV1(4, "consumption_kwh 'abc' is not a number.")]);
+
+    [Fact]
+    public void BatchChunkCompleted_v1_serializes_to_golden_file()
+    {
+        var actual = JsonSerializer.Serialize(Completed, Web);
+
+        Assert.True(
+            JsonElement.DeepEquals(JsonDocument.Parse(Golden("BatchChunkCompleted.v1.json")).RootElement, JsonDocument.Parse(actual).RootElement),
+            $"Serialized event differs from BatchChunkCompleted.v1.json: {actual}");
+    }
+
+    [Fact]
+    public void BatchChunkCompleted_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<BatchChunkCompletedV1>(Golden("BatchChunkCompleted.v1.json"), Web)!;
+
+        Assert.Equal(Completed.JobId, e.JobId);
+        Assert.Equal(Completed.ChunkNo, e.ChunkNo);
+        Assert.Equal(Completed.Results, e.Results);
+        Assert.Equal(Completed.Errors, e.Errors);
+    }
+
     private static string Golden(string file)
         => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "events", file));
 }

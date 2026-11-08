@@ -29,7 +29,9 @@ public class KafkaFixture : IAsyncLifetime
             new TopicSpecification { Name = Topics.CatalogPlanEvents, NumPartitions = 3 },
             new TopicSpecification { Name = Topics.CatalogTaxGroupEvents, NumPartitions = 3 },
             new TopicSpecification { Name = Topics.RecommendationDlq, NumPartitions = 1 },
-            new TopicSpecification { Name = Topics.RecommendationEvents, NumPartitions = 3 }
+            new TopicSpecification { Name = Topics.RecommendationEvents, NumPartitions = 3 },
+            new TopicSpecification { Name = Topics.BatchChunks, NumPartitions = 3 },
+            new TopicSpecification { Name = Topics.BatchResults, NumPartitions = 3 }
         ]);
     }
 

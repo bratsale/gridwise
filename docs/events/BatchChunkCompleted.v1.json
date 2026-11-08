@@ -1,0 +1,18 @@
+{
+  "jobId": "5eed0000-0000-0000-0000-0000000000b1",
+  "chunkNo": 1,
+  "results": [
+    {
+      "line": 2,
+      "customerId": "c1",
+      "planId": "5eed0000-0000-0000-0000-000000000001",
+      "planVersionNo": 1,
+      "planName": "Standard",
+      "total": 24.10,
+      "taxGroupVersionNo": 1
+    }
+  ],
+  "errors": [
+    { "line": 4, "error": "consumption_kwh 'abc' is not a number." }
+  ]
+}

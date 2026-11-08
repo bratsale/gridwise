@@ -13,7 +13,7 @@ public class FailureDecisionTests
     [Fact]
     public void Database_outage_waits_5_seconds_and_never_dead_letters()
     {
-        foreach (var ex in new Exception[] { new NpgsqlException("down"), new RetryLimitExceededException("down", new Exception()) })
+        foreach (var ex in new Exception[] { new NpgsqlException("down"), new TemporarilyUnavailableException("no plans"), new RetryLimitExceededException("down", new Exception()) })
         {
             var decision = CatalogConsumer.Decide(ex, failures: 100);
 

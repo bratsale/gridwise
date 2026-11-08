@@ -77,6 +77,23 @@ services:
       kafka-init:
         condition: service_completed_successfully
 
+  # The same image as recommendation, started in worker mode: only a consumer of batch.chunks (no HTTP, no migrations, no outbox publisher).
+  recommendation-worker:
+    build:
+      context: .
+      dockerfile: src/GridWise.Recommendation/Dockerfile
+    command: ["worker"]
+    environment:
+      ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
+      Kafka__BootstrapServers: kafka:9092
+    deploy:
+      replicas: 2
+    depends_on:
+      recommendation:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
   batch-db:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     environment:

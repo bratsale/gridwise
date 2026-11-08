@@ -20,16 +20,7 @@ public class CatalogEventHandler(TimeProvider time)
 
     public async Task<HandleOutcome> HandleAsync(RecommendationDbContext db, string json, CancellationToken ct)
     {
-        EventEnvelope envelope;
-        try
-        {
-            envelope = JsonSerializer.Deserialize<EventEnvelope>(json, Json)
-                ?? throw new PoisonMessageException("Message is not an event envelope.");
-        }
-        catch (JsonException ex)
-        {
-            throw new PoisonMessageException("Message is not valid JSON.", ex);
-        }
+        var envelope = EventReader.Parse(json);
 
         return envelope.Type switch
         {
@@ -68,19 +59,5 @@ public class CatalogEventHandler(TimeProvider time)
         return rows > 0 ? HandleOutcome.Applied : HandleOutcome.Duplicate;
     }
 
-    private static T ReadData<T>(EventEnvelope envelope) where T : class
-    {
-        if (envelope.Version != 1)
-            throw new PoisonMessageException($"Unsupported version {envelope.Version} of {envelope.Type}.");
-
-        try
-        {
-            return envelope.Data.Deserialize<T>(Json)
-                ?? throw new PoisonMessageException($"{envelope.Type} has no data.");
-        }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
-        {
-            throw new PoisonMessageException($"{envelope.Type} data cannot be read.", ex);
-        }
-    }
+    private static T ReadData<T>(EventEnvelope envelope) where T : class => EventReader.ReadData<T>(envelope);
 }

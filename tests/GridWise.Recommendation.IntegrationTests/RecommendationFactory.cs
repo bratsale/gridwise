@@ -34,6 +34,7 @@ public class RecommendationFactory : WebApplicationFactory<Program>, IAsyncLifet
 
         builder.ConfigureServices(services =>
         {
+            services.AddScoped<BatchChunkProcessor>(); // the web host does not need it; the worker tests do
             services.RemoveAll<TimeProvider>();
             foreach (var hostedService in new[] { typeof(CatalogConsumer), typeof(OutboxPublisher), typeof(RetentionCleanup) })
                 services.Remove(services.Single(d =>

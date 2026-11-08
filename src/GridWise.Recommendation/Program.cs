@@ -10,6 +10,12 @@ using Scalar.AspNetCore;
 if (args.Contains("reprocess-dlq"))
     return await ReprocessDlqAsync(args);
 
+if (args.Contains("worker"))
+{
+    await RunWorkerAsync(args);
+    return 0;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 foreach (var setting in new[] { "Kafka:BootstrapServers", "Kafka:GroupId" })
@@ -28,6 +34,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<RecommendationDbContext>(tags: ["ready"]);
+builder.Services.AddScoped<PlanRanker>();
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddSingleton<CatalogEventHandler>();
 builder.Services.AddHostedService<CatalogConsumer>();
@@ -62,6 +69,26 @@ app.MapRecommendationEndpoints();
 
 app.Run();
 return 0;
+
+// Worker mode: only the batch.chunks consumer. No web server, no migrations (the recommendation service migrates the shared database)
+// and no outbox publisher (the recommendation service publishes the outbox rows the workers write).
+static async Task RunWorkerAsync(string[] args)
+{
+    var builder = Host.CreateApplicationBuilder(args);
+    if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
+        throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
+
+    builder.Services.AddDbContext<RecommendationDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("Recommendation"),
+                npgsql => npgsql.EnableRetryOnFailure())
+            .UseSnakeCaseNamingConvention());
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddScoped<PlanRanker>();
+    builder.Services.AddScoped<BatchChunkProcessor>();
+    builder.Services.AddHostedService<BatchWorker>();
+
+    await builder.Build().RunAsync();
+}
 
 // One-off command: no web app, no hosted services.
 static async Task<int> ReprocessDlqAsync(string[] args)
