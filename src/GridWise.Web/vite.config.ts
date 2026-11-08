@@ -16,6 +16,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/recommendation/, ''),
       },
+      '/api/batch': {
+        target: 'http://localhost:5103',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/batch/, ''),
+      },
     },
   },
 })

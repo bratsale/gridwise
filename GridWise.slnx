@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/GridWise.Batch/GridWise.Batch.csproj" />
     <Project Path="src/GridWise.Catalog/GridWise.Catalog.csproj" />
     <Project Path="src/GridWise.Pricing/GridWise.Pricing.csproj" />
     <Project Path="src/GridWise.Recommendation/GridWise.Recommendation.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/GridWise.Batch.IntegrationTests/GridWise.Batch.IntegrationTests.csproj" />
     <Project Path="tests/GridWise.Catalog.IntegrationTests/GridWise.Catalog.IntegrationTests.csproj" />
     <Project Path="tests/GridWise.Catalog.Tests/GridWise.Catalog.Tests.csproj" />
     <Project Path="tests/GridWise.Pricing.Tests/GridWise.Pricing.Tests.csproj" />
