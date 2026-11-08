@@ -121,6 +121,20 @@ public class JobUploadTests(BatchFactory factory)
     }
 
     [Fact]
+    public async Task Line_of_200_characters_is_accepted_and_201_is_rejected_with_its_line_number()
+    {
+        var ok = Header + "\n" + new string('a', 200) + "\n";
+        Assert.Equal(HttpStatusCode.Accepted, (await Upload(Form(ok))).StatusCode);
+
+        // Line 1 header, 2 row, 3 blank, 4 too long.
+        var tooLong = Header + "\nc1,1,a\n\n" + new string('a', 201) + "\nc2,2,a\n";
+        var response = await Upload(Form(tooLong));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("Line 4 is longer than 200 characters.", await ProblemTitle(response));
+    }
+
+    [Fact]
     public async Task More_than_100000_rows_are_rejected()
     {
         var response = await Upload(Form(Csv(100_001)));

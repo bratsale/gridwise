@@ -1,8 +1,10 @@
+using GridWise.Batch.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Testcontainers.PostgreSql;
 
@@ -27,11 +29,16 @@ public class BatchFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Batch"] = _postgres.GetConnectionString()
+                ["ConnectionStrings:Batch"] = _postgres.GetConnectionString(),
+                ["Kafka:BootstrapServers"] = "unused:9092"
             }));
 
         builder.ConfigureServices(services =>
         {
+            foreach (var hosted in new[] { typeof(BatchDispatcher), typeof(OutboxPublisher), typeof(RetentionCleanup) })
+                services.Remove(services.Single(d =>
+                    d.ServiceType == typeof(IHostedService) && d.ImplementationType == hosted));
+
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
         });

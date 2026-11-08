@@ -6,6 +6,7 @@ namespace GridWise.Batch.Services;
 public static class CsvInspector
 {
     public const int MaxRows = 100_000;
+    public const int MaxLineLength = 200;
 
     private static readonly string[] ExpectedHeader = ["customer_id", "consumption_kwh", "tax_group"];
 
@@ -25,8 +26,16 @@ public static class CsvInspector
         }
 
         var rows = 0;
+        var lineNo = 1;
         while (reader.ReadLine() is { } line)
         {
+            lineNo++;
+            if (line.Length > MaxLineLength)
+            {
+                error = $"Line {lineNo} is longer than {MaxLineLength} characters.";
+                return null;
+            }
+
             if (line.Length == 0)
                 continue;
 

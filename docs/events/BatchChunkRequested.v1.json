@@ -1,0 +1,8 @@
+{
+  "jobId": "5eed0000-0000-0000-0000-0000000000b1",
+  "chunkNo": 1,
+  "rows": [
+    { "line": 2, "text": "c1,250.5,household" },
+    { "line": 4, "text": "c2,80,household" }
+  ]
+}

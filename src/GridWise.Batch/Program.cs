@@ -1,11 +1,15 @@
 using GridWise.Batch.Api;
 using GridWise.Batch.Data;
+using GridWise.Batch.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
+    throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
 
 builder.Services.AddDbContext<BatchDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Batch"),
@@ -16,6 +20,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<BatchDbContext>(tags: ["ready"]);
+builder.Services.AddHostedService<BatchDispatcher>();
+builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.AddHostedService<RetentionCleanup>();
 
 var app = builder.Build();
 

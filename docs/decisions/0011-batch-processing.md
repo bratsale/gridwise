@@ -8,7 +8,7 @@ Administrator šalje CSV sa do 100.000 kupaca. API mora odmah odgovoriti, obrada
 
 - Novi servis Batch sa svojom bazom posjeduje poslove: fajl, dijelove, progres, rezultate i otkazivanje.
 - Radnici su instance Recommendationa u režimu worker (zaseban kontejner, lokalno dvije instance). Računaju iz postojeće kopije planova preko biblioteke Pricing.
-- Batch dijeli fajl na dijelove od 500 redova i šalje ih preko outboxa na batch.chunks (ključ = id posla, 6 particija). Poruka nosi same redove.
+- Batch dijeli fajl na dijelove od 500 redova i šalje ih preko outboxa na batch.chunks (ključ = id posla i broj dijela, da se dijelovi jednog posla raspodijele na sve particije; 6 particija). Poruka nosi same redove.
 - Radnik u jednoj transakciji upisuje obrađeni dio (processed_chunks) i outbox red sa rezultatom na batch.results, pa tek onda commituje offset.
 - Batch upisuje rezultat dijela sa ON CONFLICT DO NOTHING i iz toga računa progres. Progres se šalje preko SSE-a.
 - U letu je najviše oko 20 dijelova. Otkazivanje zaustavlja slanje novih, a rezultati već poslatih se ignorišu.

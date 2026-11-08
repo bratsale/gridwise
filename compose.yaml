@@ -100,6 +100,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
+      Kafka__BootstrapServers: kafka:9092
     ports:
       - "${BATCH_PORT:-5103}:8080"
     healthcheck:
@@ -111,6 +112,8 @@ services:
     depends_on:
       batch-db:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
   web:
     build:
@@ -168,13 +171,17 @@ services:
       - |
         set -e
         create() {
+          partitions=$$1
+          shift
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
-            --partitions ${KAFKA_PARTITIONS:-3} --replication-factor 1 "$$@"
+            --partitions $$partitions --replication-factor 1 "$$@"
         }
-        create --topic catalog.plan-events --config retention.ms=-1
-        create --topic catalog.tax-group-events --config retention.ms=-1
-        create --topic recommendation.events --config retention.ms=-1
-        create --topic recommendation.dlq
+        create ${KAFKA_PARTITIONS:-3} --topic catalog.plan-events --config retention.ms=-1
+        create ${KAFKA_PARTITIONS:-3} --topic catalog.tax-group-events --config retention.ms=-1
+        create ${KAFKA_PARTITIONS:-3} --topic recommendation.events --config retention.ms=-1
+        create ${KAFKA_PARTITIONS:-3} --topic recommendation.dlq
+        create 6 --topic batch.chunks --config retention.ms=-1
+        create ${KAFKA_PARTITIONS:-3} --topic batch.results --config retention.ms=-1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
 volumes:

@@ -91,6 +91,32 @@ Owned by GridWise.Recommendation; it uses the same envelope as above.
 | total | decimal | Total price of that plan in the recommendation |
 | acceptedAt | datetime | When it was accepted (UTC, ISO 8601) |
 
+## BatchChunkRequested (v1)
+
+Owned by GridWise.Batch; it uses the same envelope as above.
+
+- Topic: `batch.chunks` (6 partitions, retention unlimited like `recommendation.events`)
+- Key: `{jobId}:{chunkNo}`, so the chunks of one job are spread over all partitions and several workers can process the same job (the order of chunks is not guaranteed and does not matter)
+- Producer: GridWise.Batch, through its outbox: one event for every chunk of 500 CSV data rows (configurable), at most 20 chunks per job are in flight at a time
+- Consumer: the batch workers (not built yet)
+- Sample: [BatchChunkRequested.v1.json](BatchChunkRequested.v1.json)
+
+| Field | Type | Meaning |
+|---|---|---|
+| jobId | guid | Id of the batch job |
+| chunkNo | int | Number of the chunk inside the job, starts at 1. (jobId, chunkNo) identifies the chunk: use it to deduplicate results |
+| rows | array | The data rows of the chunk, in file order |
+| rows[].line | int | Line number in the original file (1-based, the header is line 1, blank lines are skipped but counted) |
+| rows[].text | string | The raw CSV line, at most 200 characters (Batch rejects longer lines at upload). Batch does not parse or validate it: the worker does, row by row |
+
+## batch.results
+
+- Topic: `batch.results` (3 partitions, retention unlimited)
+- Key: job id
+- Producer: the batch workers, through their outbox (not built yet)
+- Consumer: GridWise.Batch, which records the result of a chunk and computes the progress (not built yet)
+- Format: the result event is defined in the step that builds the worker. The topic exists so that the compose stack is complete.
+
 ## Dead-letter topic
 
 `recommendation.dlq` holds messages that GridWise.Recommendation could not process:

@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GridWise.Batch.IntegrationTests/GridWise.Batch.IntegrationTests.csproj" />
+    <Project Path="tests/GridWise.Batch.Tests/GridWise.Batch.Tests.csproj" />
     <Project Path="tests/GridWise.Catalog.IntegrationTests/GridWise.Catalog.IntegrationTests.csproj" />
     <Project Path="tests/GridWise.Catalog.Tests/GridWise.Catalog.Tests.csproj" />
     <Project Path="tests/GridWise.Pricing.Tests/GridWise.Pricing.Tests.csproj" />
