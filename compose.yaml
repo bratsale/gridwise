@@ -199,6 +199,7 @@ services:
         create ${KAFKA_PARTITIONS:-3} --topic recommendation.dlq
         create 6 --topic batch.chunks --config retention.ms=-1
         create ${KAFKA_PARTITIONS:-3} --topic batch.results --config retention.ms=-1
+        create ${KAFKA_PARTITIONS:-3} --topic batch.dlq
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
 volumes:

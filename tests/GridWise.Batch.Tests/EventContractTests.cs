@@ -31,6 +31,31 @@ public class EventContractTests
         Assert.Equal(Chunk.Rows, e.Rows);
     }
 
-    private static string Golden()
-        => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "events", "BatchChunkRequested.v1.json"));
+    // Consumed: the contract is owned by Recommendation.
+    [Fact]
+    public void BatchChunkCompleted_v1_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<BatchChunkCompletedV1>(Golden("BatchChunkCompleted.v1.json"), Web)!;
+
+        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-0000000000b1"), e.JobId);
+        Assert.Equal(1, e.ChunkNo);
+        Assert.Equal(
+            [new RowResultV1(2, "c1", Guid.Parse("5eed0000-0000-0000-0000-000000000001"), 1, "Standard", 24.10m, 1)],
+            e.Results);
+        Assert.Equal([new RowErrorV1(4, "consumption_kwh 'abc' is not a number.")], e.Errors);
+    }
+
+    [Fact]
+    public void BatchChunkCompleted_v1_ignores_unknown_fields()
+    {
+        var withExtra = Golden("BatchChunkCompleted.v1.json").Replace("{", """{ "newOptionalField": 1,""", StringComparison.Ordinal);
+
+        var e = JsonSerializer.Deserialize<BatchChunkCompletedV1>(withExtra, Web)!;
+
+        Assert.Single(e.Results);
+        Assert.Single(e.Errors);
+    }
+
+    private static string Golden(string file = "BatchChunkRequested.v1.json")
+        => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "events", file));
 }

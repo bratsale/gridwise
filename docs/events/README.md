@@ -116,7 +116,7 @@ Owned by GridWise.Recommendation; it uses the same envelope as above. Batch read
 - Topic: `batch.results` (3 partitions, retention unlimited like `recommendation.events`)
 - Key: job id (`jobId`)
 - Producer: the batch workers (GridWise.Recommendation started with `worker`), through the outbox of the recommendation database: one event for every `BatchChunkRequested` they process. The recommendation service publishes the outbox.
-- Consumer: GridWise.Batch, which records the result of a chunk and computes the progress (not built yet)
+- Consumer: GridWise.Batch (group `batch`): in one transaction it marks the chunk Completed, stores the results and errors, adds their counts to the job (`processed_rows`, `failed_rows`) and completes the job when its last chunk is Completed. A result for a chunk that is not Dispatched (a repeat, or an unknown job or chunk) or for a Cancelled job is ignored.
 - Sample: [BatchChunkCompleted.v1.json](BatchChunkCompleted.v1.json)
 
 The event is written once for a chunk: a repeated `BatchChunkRequested` (same `jobId` and `chunkNo`) is ignored by the worker, so there is at most one `BatchChunkCompleted` per chunk. Use (`jobId`, `chunkNo`) to deduplicate anyway.
@@ -190,6 +190,37 @@ Run it again later. Handling is idempotent, so running it twice is safe.
 
 Messages are not moved back to the source topic: that would bring them again to every consumer group of that topic,
 and out of order with newer events of the same key. The reprocess command applies them to this service only.
+
+## Dead-letter topic of Batch
+
+`batch.dlq` holds messages that GridWise.Batch could not process. Today that is `batch.results` (the consumer is the only reader in Batch):
+
+- a poison message (not valid JSON, not an envelope, data that cannot be read)
+- an unknown version of `BatchChunkCompleted`
+- a message that still failed after 3 attempts
+
+A database outage is not a failure of the message: the same message is retried every 5 seconds without committing the offset.
+An event of an unknown type is skipped. The key and value are copied unchanged, and the headers are the same as for `recommendation.dlq`
+(`source-topic`, `source-partition`, `source-offset`, `error`, and `attempt` after a reprocess).
+
+Inspect it:
+
+```
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+  --topic batch.dlq --from-beginning --timeout-ms 10000 \
+  --property print.key=true --property print.headers=true
+```
+
+Reprocess it, after the cause is fixed:
+
+```
+docker compose run --rm batch reprocess-dlq
+```
+
+It works like the Recommendation command: it handles the messages that are in `batch.dlq` when it starts, with the same handler as the consumer
+(a message goes to the handler of its `source-topic`; today only `batch.results`), prints how many were reprocessed and how many failed again,
+and exits with 0 or 1. A message that fails again, or has an unknown or missing `source-topic`, is written to the end of `batch.dlq` with `attempt` + 1.
+Applying a result is idempotent, so running it twice is safe.
 
 ## Monitoring the pipeline
 

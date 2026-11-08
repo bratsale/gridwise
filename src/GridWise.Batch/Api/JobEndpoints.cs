@@ -81,10 +81,11 @@ public static class JobEndpoints
     private static async Task<IResult> GetJob(Guid id, BatchDbContext db, CancellationToken ct)
     {
         var job = await db.Jobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == id, ct);
+        if (job is null)
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Job not found.");
 
-        return job is null
-            ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Job not found.")
-            : Results.Ok(JobResponse.From(job));
+        var counts = await ChunkCountsAsync(db, [id], ct);
+        return Results.Ok(ToResponse(job, counts));
     }
 
     private static async Task<IResult> ListJobs(BatchDbContext db, CancellationToken ct)
@@ -95,8 +96,24 @@ public static class JobEndpoints
             .Take(50)
             .ToListAsync(ct);
 
-        return Results.Ok(jobs.Select(JobResponse.From));
+        var counts = await ChunkCountsAsync(db, jobs.Select(j => j.Id).ToList(), ct);
+        return Results.Ok(jobs.Select(j => ToResponse(j, counts)));
     }
+
+    private static async Task<Dictionary<Guid, (int Total, int Completed)>> ChunkCountsAsync(
+        BatchDbContext db, List<Guid> jobIds, CancellationToken ct)
+    {
+        var rows = await db.Chunks.AsNoTracking()
+            .Where(c => jobIds.Contains(c.JobId))
+            .GroupBy(c => c.JobId)
+            .Select(g => new { JobId = g.Key, Total = g.Count(), Completed = g.Count(c => c.Status == ChunkStatus.Completed) })
+            .ToListAsync(ct);
+
+        return rows.ToDictionary(r => r.JobId, r => (r.Total, r.Completed));
+    }
+
+    private static JobResponse ToResponse(Job job, Dictionary<Guid, (int Total, int Completed)> counts)
+        => counts.TryGetValue(job.Id, out var c) ? JobResponse.From(job, c.Total, c.Completed) : JobResponse.From(job, 0, 0);
 
     private static IResult Rejected(int status, string title) => Results.Problem(statusCode: status, title: title);
 }

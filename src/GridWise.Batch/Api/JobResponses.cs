@@ -9,10 +9,15 @@ public record JobResponse(
     string Status,
     string FileName,
     int TotalRows,
+    int TotalChunks,
+    int CompletedChunks,
+    int ProcessedRows,
+    int FailedRows,
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
     DateTimeOffset? FinishedAt)
 {
-    public static JobResponse From(Job j)
-        => new(j.Id, j.Status.ToString(), j.FileName, j.TotalRows, j.CreatedAt, j.StartedAt, j.FinishedAt);
+    public static JobResponse From(Job j, int totalChunks, int completedChunks)
+        => new(j.Id, j.Status.ToString(), j.FileName, j.TotalRows, totalChunks, completedChunks,
+            j.ProcessedRows, j.FailedRows, j.CreatedAt, j.StartedAt, j.FinishedAt);
 }

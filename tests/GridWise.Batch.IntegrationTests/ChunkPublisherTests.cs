@@ -23,7 +23,12 @@ public class KafkaFixture : IAsyncLifetime
         await _kafka.StartAsync();
 
         using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = BootstrapServers }).Build();
-        await admin.CreateTopicsAsync([new TopicSpecification { Name = Topics.BatchChunks, NumPartitions = 6 }]);
+        await admin.CreateTopicsAsync(
+        [
+            new TopicSpecification { Name = Topics.BatchChunks, NumPartitions = 6 },
+            new TopicSpecification { Name = Topics.BatchResults, NumPartitions = 3 },
+            new TopicSpecification { Name = Topics.BatchDlq, NumPartitions = 1 }
+        ]);
     }
 
     public Task DisposeAsync() => _kafka.DisposeAsync().AsTask();

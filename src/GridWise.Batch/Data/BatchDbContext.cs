@@ -7,6 +7,8 @@ public class BatchDbContext(DbContextOptions<BatchDbContext> options) : DbContex
 {
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobFile> JobFiles => Set<JobFile>();
+    public DbSet<JobResult> JobResults => Set<JobResult>();
+    public DbSet<JobError> JobErrors => Set<JobError>();
     public DbSet<Chunk> Chunks => Set<Chunk>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

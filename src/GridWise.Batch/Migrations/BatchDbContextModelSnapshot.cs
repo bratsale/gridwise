@@ -70,6 +70,10 @@ namespace GridWise.Batch.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("FailedRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_rows");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -79,6 +83,10 @@ namespace GridWise.Batch.Migrations
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
+
+                    b.Property<int>("ProcessedRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("processed_rows");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -103,6 +111,28 @@ namespace GridWise.Batch.Migrations
                     b.ToTable("jobs", (string)null);
                 });
 
+            modelBuilder.Entity("GridWise.Batch.Domain.JobError", b =>
+                {
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<int>("Line")
+                        .HasColumnType("integer")
+                        .HasColumnName("line");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("error");
+
+                    b.HasKey("JobId", "Line")
+                        .HasName("pk_job_errors");
+
+                    b.ToTable("job_errors", (string)null);
+                });
+
             modelBuilder.Entity("GridWise.Batch.Domain.JobFile", b =>
                 {
                     b.Property<Guid>("JobId")
@@ -118,6 +148,51 @@ namespace GridWise.Batch.Migrations
                         .HasName("pk_job_files");
 
                     b.ToTable("job_files", (string)null);
+                });
+
+            modelBuilder.Entity("GridWise.Batch.Domain.JobResult", b =>
+                {
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<int>("Line")
+                        .HasColumnType("integer")
+                        .HasColumnName("line");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("customer_id");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("plan_name");
+
+                    b.Property<int>("PlanVersionNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_version_no");
+
+                    b.Property<int>("TaxGroupVersionNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("tax_group_version_no");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total");
+
+                    b.HasKey("JobId", "Line")
+                        .HasName("pk_job_results");
+
+                    b.ToTable("job_results", (string)null);
                 });
 
             modelBuilder.Entity("GridWise.Batch.Domain.OutboxMessage", b =>
@@ -183,6 +258,16 @@ namespace GridWise.Batch.Migrations
                         .HasConstraintName("fk_chunks_jobs_job_id");
                 });
 
+            modelBuilder.Entity("GridWise.Batch.Domain.JobError", b =>
+                {
+                    b.HasOne("GridWise.Batch.Domain.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_errors_jobs_job_id");
+                });
+
             modelBuilder.Entity("GridWise.Batch.Domain.JobFile", b =>
                 {
                     b.HasOne("GridWise.Batch.Domain.Job", null)
@@ -191,6 +276,16 @@ namespace GridWise.Batch.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_job_files_jobs_job_id");
+                });
+
+            modelBuilder.Entity("GridWise.Batch.Domain.JobResult", b =>
+                {
+                    b.HasOne("GridWise.Batch.Domain.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_results_jobs_job_id");
                 });
 #pragma warning restore 612, 618
         }

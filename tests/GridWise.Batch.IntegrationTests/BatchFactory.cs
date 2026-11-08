@@ -35,7 +35,7 @@ public class BatchFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         builder.ConfigureServices(services =>
         {
-            foreach (var hosted in new[] { typeof(BatchDispatcher), typeof(OutboxPublisher), typeof(RetentionCleanup) })
+            foreach (var hosted in new[] { typeof(BatchDispatcher), typeof(OutboxPublisher), typeof(RetentionCleanup), typeof(BatchResultsConsumer) })
                 services.Remove(services.Single(d =>
                     d.ServiceType == typeof(IHostedService) && d.ImplementationType == hosted));
 
