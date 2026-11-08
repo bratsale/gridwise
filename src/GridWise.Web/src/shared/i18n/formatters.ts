@@ -11,10 +11,12 @@ export function createFormatters(language: Language) {
   const quantity = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 })
   const price = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
   const percent = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })
+  const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' })
   const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
 
   return {
+    integer: (value: Value) => integer.format(Number(value)),
     money: (value: Value) => money.format(Number(value)),
     kwh: (value: Value) => `${quantity.format(Number(value))} kWh`,
     price: (value: Value) => price.format(Number(value)),

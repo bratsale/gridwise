@@ -732,3 +732,92 @@ dialog.confirm::backdrop {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* ---------- Batch ---------- */
+.badge.failed {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* A link that looks like a button (the CSV downloads). */
+a.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.button:hover {
+  background: var(--row-hover);
+  border-color: var(--accent);
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-6) var(--space-4);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.dropzone.dragging {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.progress {
+  height: 8px;
+  min-width: 120px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.progress-cell {
+  min-width: 160px;
+}
+
+.progress-cell .hint {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.detail-head h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-head button {
+  margin-left: auto;
+}
+
+table.plans tr.selected {
+  background: var(--accent-soft);
+}

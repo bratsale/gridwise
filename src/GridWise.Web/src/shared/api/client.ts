@@ -1,8 +1,9 @@
-export type Service = 'catalog' | 'recommendation'
+export type Service = 'catalog' | 'recommendation' | 'batch'
 
 const basePaths: Record<Service, string> = {
   catalog: '/api/catalog',
   recommendation: '/api/recommendation',
+  batch: '/api/batch',
 }
 
 export interface ProblemDetails {
@@ -39,14 +40,21 @@ export async function request<T>(
     method,
     headers: {
       'X-Correlation-Id': crypto.randomUUID(),
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      // A FormData body (a file upload) sets its own Content-Type, with the multipart boundary.
+      ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   })
 
   const text = await response.text()
-  const parsed: unknown = text ? JSON.parse(text) : undefined
+  let parsed: unknown
+  try {
+    parsed = text ? JSON.parse(text) : undefined
+  } catch (error) {
+    // An error page that is not JSON (for example nginx answering 413) still has a status the caller can use.
+    if (response.ok) throw error
+  }
 
   return response.ok
     ? { ok: true, status: response.status, headers: response.headers, body: parsed as T }

@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace GridWise.Batch.IntegrationTests;
 
@@ -129,6 +131,22 @@ public class JobEventsTests(BatchFactory factory)
         var block = await events.NextBlockAsync(cts.Token);
 
         Assert.StartsWith(": heartbeat", block);
+    }
+
+    [Fact]
+    public async Task An_open_stream_ends_when_the_application_is_stopping()
+    {
+        var jobId = await _t.UploadAndDispatch(1200);
+        // Its own host, so stopping it does not affect the other tests.
+        using var own = factory.WithWebHostBuilder(_ => { });
+        using var cts = new CancellationTokenSource(Limit);
+        var (response, events) = await Open(own.CreateClient(), jobId, cts.Token);
+        using var _ = response;
+        await events.NextEventAsync(cts.Token);
+
+        own.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+
+        Assert.Null(await events.NextEventAsync(cts.Token)); // closed by the server, not by the client
     }
 
     [Fact]

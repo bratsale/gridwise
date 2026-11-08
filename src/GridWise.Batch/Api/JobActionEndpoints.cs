@@ -99,8 +99,14 @@ public static class JobActionEndpoints
     // (EventSource does it by itself) simply gets the current state first and continues from there. The id: field is a counter
     // of this connection and is not used to resume (Last-Event-ID is ignored). The stream is paced with the real clock
     // (not TimeProvider): it only watches the database and has no stored time to fake.
-    private static async Task<IResult> StreamEvents(Guid id, HttpContext http, BatchDbContext db, IConfiguration config, CancellationToken ct)
+    private static async Task<IResult> StreamEvents(
+        Guid id, HttpContext http, BatchDbContext db, IConfiguration config, IHostApplicationLifetime lifetime, CancellationToken requestAborted)
     {
+        // An open stream never ends by itself, so it would hold the shutdown until the container is killed (and a killed
+        // service leaves its Kafka consumer group late). Closing it when the application stops lets the client reconnect to the new instance.
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, lifetime.ApplicationStopping);
+        var ct = linked.Token;
+
         var pollInterval = config.GetValue<int?>("Batch:SsePollMilliseconds") is { } ms ? TimeSpan.FromMilliseconds(ms) : DefaultPollInterval;
         var heartbeat = config.GetValue<int?>("Batch:SseHeartbeatSeconds") is { } sec ? TimeSpan.FromSeconds(sec) : DefaultHeartbeat;
 
@@ -143,7 +149,7 @@ public static class JobActionEndpoints
         }
         catch (OperationCanceledException)
         {
-            // The client went away.
+            // The client went away, or the service is stopping.
         }
 
         return Results.Empty;

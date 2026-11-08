@@ -1,18 +1,21 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
-export type AdminSection = 'plans' | 'taxGroups'
+export type AdminSection = 'plans' | 'taxGroups' | 'batch'
 export type Route = { tab: 'customer' } | { tab: 'admin'; section: AdminSection }
 
-// #customer, #admin/plans, #admin/tax-groups. Anything else (including no hash) is the plans page.
+// #customer, #admin/plans, #admin/tax-groups, #admin/batch. Anything else (including no hash) is the plans page.
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, '')
   if (path === 'customer') return { tab: 'customer' }
-  return { tab: 'admin', section: path === 'admin/tax-groups' ? 'taxGroups' : 'plans' }
+  if (path === 'admin/tax-groups') return { tab: 'admin', section: 'taxGroups' }
+  if (path === 'admin/batch') return { tab: 'admin', section: 'batch' }
+  return { tab: 'admin', section: 'plans' }
 }
 
 export function routeToHash(route: Route): string {
   if (route.tab === 'customer') return '#customer'
-  return route.section === 'taxGroups' ? '#admin/tax-groups' : '#admin/plans'
+  if (route.section === 'taxGroups') return '#admin/tax-groups'
+  return route.section === 'batch' ? '#admin/batch' : '#admin/plans'
 }
 
 function subscribe(onChange: () => void) {

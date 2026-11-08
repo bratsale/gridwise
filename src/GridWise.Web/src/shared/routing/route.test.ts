@@ -6,6 +6,7 @@ describe('route hash', () => {
     ['#customer', { tab: 'customer' }],
     ['#admin/plans', { tab: 'admin', section: 'plans' }],
     ['#admin/tax-groups', { tab: 'admin', section: 'taxGroups' }],
+    ['#admin/batch', { tab: 'admin', section: 'batch' }],
   ]
 
   it.each(routes)('%s round-trips', (hash, route) => {
