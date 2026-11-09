@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useT } from '../i18n/LanguageProvider.tsx'
+import { useT } from '../i18n/useLanguage.ts'
 
 // Modal confirmation built on the native <dialog>. Escape and Cancel call onCancel, OK calls onConfirm.
 export function ConfirmDialog({

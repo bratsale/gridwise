@@ -1,4 +1,4 @@
-import { useMessageText } from '../../shared/i18n/LanguageProvider.tsx'
+import { useMessageText } from '../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../shared/ui/Banner.tsx'
 import { CustomerForm } from './components/CustomerForm.tsx'
 import { RecommendationResult } from './components/RecommendationResult.tsx'

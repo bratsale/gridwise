@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useFormat, useMessageText, useT } from '../i18n/LanguageProvider.tsx'
+import { useFormat, useMessageText, useT } from '../i18n/useLanguage.ts'
 import type { Message } from '../i18n/message.ts'
 import { Banner } from './Banner.tsx'
 import { ConfirmDialog } from './ConfirmDialog.tsx'

@@ -22,10 +22,8 @@ export function usePlans() {
   const [retiring, setRetiring] = useState<Plan | null>(null)
   const [history, setHistory] = useState<{ plan: Plan; versions: Plan[] | null } | null>(null)
 
-  // `silent` refreshes in the background: the list stays on screen instead of turning into a spinner.
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    const response = await listPlans()
+  // Shows the response of the list request. It is called when the response arrives, never synchronously from an effect.
+  const apply = useCallback((response: Awaited<ReturnType<typeof listPlans>>) => {
     if (response.ok) {
       setPlans(response.body)
       setListError(null)
@@ -35,9 +33,16 @@ export function usePlans() {
     setLoading(false)
   }, [setPlans])
 
+  // `silent` refreshes in the background: the list stays on screen instead of turning into a spinner.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    apply(await listPlans())
+  }, [apply])
+
+  // `loading` starts as true, so the first fetch does not need to set it.
   useEffect(() => {
-    void load()
-  }, [load])
+    void listPlans().then(apply)
+  }, [apply])
 
   function openForm(session: FormSession) {
     setRetiring(null)

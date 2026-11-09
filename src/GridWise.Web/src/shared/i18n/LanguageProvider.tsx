@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { en, type TranslationKey } from './en.ts'
-import { createFormatters, LOCALES, type Formatters, type Language } from './formatters.ts'
-import type { Message, Params } from './message.ts'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { en } from './en.ts'
+import { createFormatters, LOCALES, type Language } from './formatters.ts'
+import type { Message } from './message.ts'
 import { sr } from './sr.ts'
+import { Context, type LanguageContext, type T } from './useLanguage.ts'
 
 const dictionaries = { en, sr }
 const STORAGE_KEY = 'gridwise.lang'
@@ -16,18 +17,6 @@ function initialLanguage(): Language {
   }
   return navigator.language.toLowerCase().startsWith('sr') ? 'sr' : 'en'
 }
-
-export type T = (key: TranslationKey, params?: Params) => string
-
-interface LanguageContext {
-  language: Language
-  setLanguage: (language: Language) => void
-  t: T
-  text: (message: Message) => string
-  format: Formatters
-}
-
-const Context = createContext<LanguageContext | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(initialLanguage)
@@ -50,18 +39,4 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language])
 
   return <Context.Provider value={value}>{children}</Context.Provider>
-}
-
-function useLanguageContext() {
-  const value = useContext(Context)
-  if (!value) throw new Error('LanguageProvider is missing')
-  return value
-}
-
-export const useT = () => useLanguageContext().t
-export const useMessageText = () => useLanguageContext().text
-export const useFormat = () => useLanguageContext().format
-export const useLanguage = () => {
-  const { language, setLanguage } = useLanguageContext()
-  return { language, setLanguage }
 }

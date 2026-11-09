@@ -1,5 +1,5 @@
-import { useT } from '../i18n/LanguageProvider.tsx'
-import { useTheme, type Theme } from './ThemeProvider.tsx'
+import { useT } from '../i18n/useLanguage.ts'
+import { useTheme, type Theme } from './useTheme.ts'
 
 const options: { value: Theme; label: 'theme.light' | 'theme.dark' | 'theme.system' }[] = [
   { value: 'light', label: 'theme.light' },

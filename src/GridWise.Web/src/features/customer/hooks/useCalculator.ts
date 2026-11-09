@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import type { ProblemDetails } from '../../../shared/api/client.ts'
 import { failureMessage } from '../../../shared/api/failure.ts'
 import { errorsFor } from '../../../shared/api/problems.ts'
@@ -10,7 +10,7 @@ export const quoteKey = (quote: Quote) => `${quote.planId}:${String(quote.planVe
 
 export function useCalculator(taxGroups: TaxGroup[]) {
   const [consumption, setConsumption] = useState('')
-  const [taxGroup, setTaxGroup] = useState('')
+  const [chosenTaxGroup, setTaxGroup] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [problem, setProblem] = useState<ProblemDetails | undefined>()
   const [message, setMessage] = useState<Message | null>(null)
@@ -23,10 +23,8 @@ export function useCalculator(taxGroups: TaxGroup[]) {
   const [accepted, setAccepted] = useState<{ plan: string; total: number | string } | null>(null)
   const [acceptError, setAcceptError] = useState<Message | null>(null)
 
-  // The first tax group is chosen when they arrive.
-  useEffect(() => {
-    setTaxGroup((current) => current || taxGroups[0]?.code || '')
-  }, [taxGroups])
+  // Until the user chooses, the first tax group is the selected one (worked out here, so no effect has to set it when the groups arrive).
+  const taxGroup = chosenTaxGroup || taxGroups[0]?.code || ''
 
   const clientErrors = validateCustomer({ consumption, taxGroup })
 

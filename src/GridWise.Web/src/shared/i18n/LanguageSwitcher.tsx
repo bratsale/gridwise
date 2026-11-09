@@ -1,4 +1,4 @@
-import { useLanguage, useT } from './LanguageProvider.tsx'
+import { useLanguage, useT } from './useLanguage.ts'
 import type { Language } from './formatters.ts'
 
 const options: { value: Language; label: string }[] = [

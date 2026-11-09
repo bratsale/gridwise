@@ -1,4 +1,4 @@
-import { useFormat, useMessageText, useT } from '../../../shared/i18n/LanguageProvider.tsx'
+import { useFormat, useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { TaxGroupHistory } from './components/TaxGroupHistory.tsx'
 import { TaxGroupList } from './components/TaxGroupList.tsx'

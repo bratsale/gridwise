@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useFormat, useMessageText, useT } from '../../../shared/i18n/LanguageProvider.tsx'
+import { useFormat, useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../shared/i18n/message.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import type { Quote, Recommendation } from '../api/customerApi.ts'

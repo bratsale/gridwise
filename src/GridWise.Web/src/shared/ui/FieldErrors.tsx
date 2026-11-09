@@ -1,4 +1,4 @@
-import { useMessageText } from '../i18n/LanguageProvider.tsx'
+import { useMessageText } from '../i18n/useLanguage.ts'
 import type { Message } from '../i18n/message.ts'
 
 export function FieldErrors({ messages }: { messages: Message[] }) {

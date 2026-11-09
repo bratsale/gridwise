@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { useT } from '../../shared/i18n/LanguageProvider.tsx'
+import { useT } from '../../shared/i18n/useLanguage.ts'
 import type { AdminSection } from '../../shared/routing/route.ts'
 import { Loading } from '../../shared/ui/Loading.tsx'
 

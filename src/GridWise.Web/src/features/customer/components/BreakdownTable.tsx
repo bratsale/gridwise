@@ -1,4 +1,4 @@
-import { useFormat, useT } from '../../../shared/i18n/LanguageProvider.tsx'
+import { useFormat, useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Breakdown } from '../api/customerApi.ts'
 
 export function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {

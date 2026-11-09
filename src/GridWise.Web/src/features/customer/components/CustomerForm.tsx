@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useT } from '../../../shared/i18n/LanguageProvider.tsx'
+import { useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../shared/i18n/message.ts'
 import { FieldErrors } from '../../../shared/ui/FieldErrors.tsx'
 import type { TaxGroup } from '../api/customerApi.ts'

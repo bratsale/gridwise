@@ -1,4 +1,4 @@
-import { useT } from '../../../../shared/i18n/LanguageProvider.tsx'
+import { useT } from '../../../../shared/i18n/useLanguage.ts'
 import type { JobStatus } from '../api/batchApi.ts'
 
 const classes: Record<JobStatus, string> = {

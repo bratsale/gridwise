@@ -1,4 +1,4 @@
-import { useFormat, useT } from '../../../../shared/i18n/LanguageProvider.tsx'
+import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
 import { ProgressBar } from '../../../../shared/ui/ProgressBar.tsx'
 import type { Job } from '../api/batchApi.ts'

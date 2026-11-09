@@ -24,10 +24,8 @@ export function useTaxGroupList() {
   const [retiring, setRetiring] = useState<TaxGroup | null>(null)
   const [history, setHistory] = useState<{ taxGroup: TaxGroup; versions: TaxGroup[] | null } | null>(null)
 
-  // `silent` refreshes in the background: the list stays on screen instead of turning into a spinner.
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    const response = await listTaxGroups()
+  // Shows the response of the list request. It is called when the response arrives, never synchronously from an effect.
+  const apply = useCallback((response: Awaited<ReturnType<typeof listTaxGroups>>) => {
     if (response.ok) {
       setItems(response.body)
       setListError(null)
@@ -37,9 +35,16 @@ export function useTaxGroupList() {
     setLoading(false)
   }, [setItems])
 
+  // `silent` refreshes in the background: the list stays on screen instead of turning into a spinner.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    apply(await listTaxGroups())
+  }, [apply])
+
+  // `loading` starts as true, so the first fetch does not need to set it.
   useEffect(() => {
-    void load()
-  }, [load])
+    void listTaxGroups().then(apply)
+  }, [apply])
 
   function openForm(session: TaxGroupFormSession) {
     setRetiring(null)

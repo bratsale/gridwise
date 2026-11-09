@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useMessageText, useT } from '../../../../shared/i18n/LanguageProvider.tsx'
+import { useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../../shared/i18n/message.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { FieldErrors } from '../../../../shared/ui/FieldErrors.tsx'

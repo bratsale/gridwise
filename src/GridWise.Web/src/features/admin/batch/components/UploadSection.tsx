@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from 'react'
-import { useMessageText, useT } from '../../../../shared/i18n/LanguageProvider.tsx'
+import { useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { useUpload } from '../hooks/useUpload.ts'
 

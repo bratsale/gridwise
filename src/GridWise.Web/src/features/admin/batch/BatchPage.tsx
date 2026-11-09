@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMessageText, useT } from '../../../shared/i18n/LanguageProvider.tsx'
+import { useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { JobDetail } from './components/JobDetail.tsx'
 import { JobList } from './components/JobList.tsx'

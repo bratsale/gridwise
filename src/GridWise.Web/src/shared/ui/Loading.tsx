@@ -1,4 +1,4 @@
-import { useT } from '../i18n/LanguageProvider.tsx'
+import { useT } from '../i18n/useLanguage.ts'
 
 export function Loading() {
   const t = useT()

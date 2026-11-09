@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Context, type Theme } from './useTheme.ts'
 
-export type Theme = 'light' | 'dark' | 'system'
 const STORAGE_KEY = 'gridwise.theme'
 
 function initialTheme(): Theme {
@@ -12,8 +12,6 @@ function initialTheme(): Theme {
   }
   return 'system'
 }
-
-const Context = createContext<{ theme: Theme; setTheme: (theme: Theme) => void } | null>(null)
 
 // index.html applies the saved theme before React loads; this keeps data-theme and storage in step afterwards.
 // "system" has no data-theme: the CSS follows prefers-color-scheme then.
@@ -33,10 +31,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   return <Context.Provider value={{ theme, setTheme }}>{children}</Context.Provider>
-}
-
-export function useTheme() {
-  const value = useContext(Context)
-  if (!value) throw new Error('ThemeProvider is missing')
-  return value
 }

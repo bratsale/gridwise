@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useT } from '../i18n/LanguageProvider.tsx'
+import { useT } from '../i18n/useLanguage.ts'
 
 // A coloured notice with an icon; onDismiss adds a dismiss button.
 export function Banner({

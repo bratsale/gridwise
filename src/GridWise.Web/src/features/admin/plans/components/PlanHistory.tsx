@@ -1,4 +1,4 @@
-import { useFormat, useT } from '../../../../shared/i18n/LanguageProvider.tsx'
+import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
 import type { Plan } from '../api/plansApi.ts'

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { useRoute } from './shared/routing/route.ts'
 import { LanguageSwitcher } from './shared/i18n/LanguageSwitcher.tsx'
-import { useT } from './shared/i18n/LanguageProvider.tsx'
+import { useT } from './shared/i18n/useLanguage.ts'
 import { ThemeSwitcher } from './shared/theme/ThemeSwitcher.tsx'
 import { Loading } from './shared/ui/Loading.tsx'
 
