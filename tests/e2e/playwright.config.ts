@@ -10,7 +10,8 @@ export default defineConfig({
   fullyParallel: false,
   timeout: 90_000,
   expect: { timeout: 10_000 },
-  reporter: [['list']],
+  // In CI the HTML report is uploaded when a test fails.
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5100',
     locale: 'en-US', // the labels the tests look for are the English ones

@@ -1,0 +1,231 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  # Rollback: deploy an earlier commit's images (already in ghcr.io) to one environment. Nothing is rebuilt.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to deploy, a commit SHA that was built by this pipeline
+        required: true
+        type: string
+      environment:
+        description: Environment to deploy to
+        required: true
+        type: choice
+        options: [dev, qa, prod]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  backend:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore GridWise.slnx
+      - run: dotnet build GridWise.slnx -c Release --no-restore
+      # The integration tests start PostgreSQL and Kafka with Testcontainers, on the Docker of the runner.
+      - run: dotnet test GridWise.slnx -c Release --no-build --logger "trx" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn
+
+  web:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/GridWise.Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/GridWise.Web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  # Build once: these images are what e2e tests and every environment run, selected by the commit SHA.
+  images:
+    needs: [backend, web]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: catalog, context: ., file: src/GridWise.Catalog/Dockerfile }
+          - { service: recommendation, context: ., file: src/GridWise.Recommendation/Dockerfile }
+          - { service: batch, context: ., file: src/GridWise.Batch/Dockerfile }
+          - { service: web, context: src/GridWise.Web, file: src/GridWise.Web/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Image names must be lowercase; the owner may not be.
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise/${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  e2e:
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start the stack from the pushed images
+        run: |
+          export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+          docker compose pull --quiet
+          docker compose up -d --no-build --wait --wait-timeout 300
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - name: Install the tests and the browser
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run the tests
+        working-directory: tests/e2e
+        run: npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          if-no-files-found: ignore
+      - name: Show the logs when something failed
+        if: failure()
+        run: |
+          export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+          docker compose ps -a
+          docker compose logs --tail 80
+      - name: Stop the stack and remove its volumes
+        if: always()
+        run: |
+          export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+          docker compose down -v
+
+  # Promotion: the same images, one environment after the other. Required reviewers on the qa and prod
+  # GitHub environments make the pipeline wait for an approval before those jobs start (docs/deployment.md).
+  deploy-dev:
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      packages: read
+    env:
+      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with:
+          environment: dev
+          tag: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-qa:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: qa
+    permissions:
+      contents: read
+      packages: read
+    env:
+      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with:
+          environment: qa
+          tag: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-prod:
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      packages: read
+    env:
+      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with:
+          environment: prod
+          tag: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Rollback: only runs when started by hand. The environment is chosen by the input, so its approvals and secrets apply.
+  rollback:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: read
+    env:
+      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with:
+          environment: ${{ inputs.environment }}
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}

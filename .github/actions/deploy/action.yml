@@ -1,0 +1,63 @@
+name: Simulated deployment
+description: >
+  Pulls the images of one commit (by tag) from ghcr.io and starts the stack with the settings of one environment,
+  runs the smoke test, then stops it. A real deployment would replace the start/stop with a server or cluster (docs/deployment.md).
+inputs:
+  environment:
+    description: dev, qa or prod (the file deploy/<environment>.env is used)
+    required: true
+  tag:
+    description: Image tag to deploy (a commit SHA)
+    required: true
+  token:
+    description: Token with read access to the packages
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Log in to ghcr.io
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+    # Passwords arrive as environment variables of the calling job (from GitHub secrets, with dev defaults).
+    # A variable in the environment wins over the same name in --env-file, so the env file never needs a secret.
+    - name: Pull the images and start the stack
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+        echo "Deploying $REGISTRY/*:$TAG to $ENVIRONMENT"
+        docker compose --env-file "deploy/$ENVIRONMENT.env" pull --quiet catalog recommendation recommendation-worker batch web
+        docker compose --env-file "deploy/$ENVIRONMENT.env" up -d --no-build --wait --wait-timeout 300
+
+    - name: Smoke test
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: scripts/smoke-test.sh "deploy/$ENVIRONMENT.env"
+
+    - name: Show the logs when something failed
+      if: failure()
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+        docker compose --env-file "deploy/$ENVIRONMENT.env" ps -a
+        docker compose --env-file "deploy/$ENVIRONMENT.env" logs --tail 80
+
+    # The deployment is simulated, so nothing keeps running after the job.
+    - name: Stop the stack
+      if: always()
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
+        docker compose --env-file "deploy/$ENVIRONMENT.env" down -v

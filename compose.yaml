@@ -18,6 +18,7 @@ services:
       retries: 10
 
   catalog:
+    image: ${REGISTRY:-gridwise}/catalog:${TAG:-local}
     build:
       context: .
       dockerfile: src/GridWise.Catalog/Dockerfile
@@ -25,6 +26,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
     ports:
       - "${CATALOG_PORT:-5101}:8080"
     healthcheck:
@@ -56,6 +58,7 @@ services:
       retries: 10
 
   recommendation:
+    image: ${REGISTRY:-gridwise}/recommendation:${TAG:-local}
     build:
       context: .
       dockerfile: src/GridWise.Recommendation/Dockerfile
@@ -63,6 +66,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
     ports:
       - "${RECOMMENDATION_PORT:-5102}:8080"
     healthcheck:
@@ -77,8 +81,9 @@ services:
       kafka-init:
         condition: service_completed_successfully
 
-  # The same image as recommendation, started in worker mode: only a consumer of batch.chunks (no HTTP, no migrations, no outbox publisher).
+  # The same image as recommendation (same name and tag; the build section is the same too, so a local build is cached), started in worker mode: only a consumer of batch.chunks (no HTTP, no migrations, no outbox publisher).
   recommendation-worker:
+    image: ${REGISTRY:-gridwise}/recommendation:${TAG:-local}
     build:
       context: .
       dockerfile: src/GridWise.Recommendation/Dockerfile
@@ -86,6 +91,7 @@ services:
     environment:
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
     deploy:
       replicas: 2
     depends_on:
@@ -111,6 +117,7 @@ services:
       retries: 10
 
   batch:
+    image: ${REGISTRY:-gridwise}/batch:${TAG:-local}
     build:
       context: .
       dockerfile: src/GridWise.Batch/Dockerfile
@@ -118,6 +125,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
     ports:
       - "${BATCH_PORT:-5103}:8080"
     healthcheck:
@@ -133,6 +141,7 @@ services:
         condition: service_completed_successfully
 
   web:
+    image: ${REGISTRY:-gridwise}/web:${TAG:-local}
     build:
       context: src/GridWise.Web
     ports:
