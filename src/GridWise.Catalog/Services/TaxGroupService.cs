@@ -3,6 +3,7 @@ using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Domain;
 using GridWise.Catalog.Events;
+using GridWise.Catalog.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -153,6 +154,7 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
                 new TaxGroupVersionCreatedV1(code, versionNo, vat, ecoTax, status.ToString(), effectiveFrom),
                 Json),
             CorrelationId = correlationId,
+            TraceParent = Tracing.CurrentTraceParent(),
             OccurredAt = now
         });
 

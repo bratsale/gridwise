@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Text;
 using Confluent.Kafka;
 using GridWise.Batch.Events;
+using GridWise.Batch.Telemetry;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
@@ -38,6 +40,8 @@ public static class MessageProcessing
         IConsumer<string, string> consumer, IProducer<string, string> producer, ConsumeResult<string, string> message,
         Func<CancellationToken, Task> handle, TimeProvider time, ILogger logger, CancellationToken ct)
     {
+        // The whole handling (retries included) is one span, a child of the publisher's.
+        using var activity = Tracing.StartProcess(message);
         var failures = 0;
         while (true)
         {
@@ -57,6 +61,7 @@ public static class MessageProcessing
                 {
                     logger.LogError(ex, "Message {Topic}[{Partition}]@{Offset} goes to the dead-letter topic.",
                         message.Topic, message.Partition.Value, message.Offset.Value);
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                     await DeadLetterAsync(producer, message, ex, time, logger, ct);
                     consumer.Commit(message);
                     return;
@@ -86,6 +91,9 @@ public static class MessageProcessing
                 new Header("error", Encoding.UTF8.GetBytes(error.Message))
             ]
         };
+        // The trace goes with the message, so reprocessing it from the dead-letter topic continues the same trace.
+        if ((Tracing.CurrentTraceParent() ?? Tracing.TraceParentOf(message)) is { } traceParent)
+            dead.Headers.Add(Tracing.TraceParentHeader, Encoding.UTF8.GetBytes(traceParent));
 
         while (true)
         {

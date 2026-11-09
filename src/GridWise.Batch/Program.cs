@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using GridWise.Batch.Api;
 using GridWise.Batch.Data;
 using GridWise.Batch.Services;
+using GridWise.Batch.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -11,6 +12,7 @@ if (args.Contains("reprocess-dlq"))
     return await ReprocessDlqAsync(args);
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddGridWiseTelemetry("batch");
 
 if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
     throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
@@ -48,6 +50,8 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
+app.UseCorrelationId();
+
 app.MapOpenApi();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
 app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
@@ -63,6 +67,7 @@ return 0;
 static async Task<int> ReprocessDlqAsync(string[] args)
 {
     var builder = Host.CreateApplicationBuilder(args);
+    builder.AddGridWiseTelemetry("batch-dlq-reprocess");
     var bootstrapServers = builder.Configuration["Kafka:BootstrapServers"];
     if (string.IsNullOrEmpty(bootstrapServers))
         throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");

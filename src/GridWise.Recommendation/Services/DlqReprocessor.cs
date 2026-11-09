@@ -2,6 +2,7 @@ using System.Text;
 using Confluent.Kafka;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Events;
+using GridWise.Recommendation.Telemetry;
 
 namespace GridWise.Recommendation.Services;
 
@@ -54,6 +55,8 @@ public static class DlqReprocessor
                     }
                     else
                     {
+                        // A child of the original trace (its traceparent header was kept in the dead-letter message).
+                        using var activity = Tracing.StartProcess(message);
                         try
                         {
                             using var db = createDb();

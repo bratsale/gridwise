@@ -1,12 +1,14 @@
 using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Services;
+using GridWise.Catalog.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddGridWiseTelemetry("catalog");
 
 if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
     throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
@@ -43,6 +45,8 @@ for (var attempt = 1; ; attempt++)
         await Task.Delay(TimeSpan.FromSeconds(2));
     }
 }
+
+app.UseCorrelationId();
 
 app.MapOpenApi();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();

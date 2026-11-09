@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using GridWise.Recommendation.Api;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Services;
+using GridWise.Recommendation.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -17,6 +18,7 @@ if (args.Contains("worker"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddGridWiseTelemetry("recommendation");
 
 foreach (var setting in new[] { "Kafka:BootstrapServers", "Kafka:GroupId" })
 {
@@ -59,6 +61,8 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
+app.UseCorrelationId();
+
 app.MapOpenApi();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
 app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
@@ -75,6 +79,7 @@ return 0;
 static async Task RunWorkerAsync(string[] args)
 {
     var builder = Host.CreateApplicationBuilder(args);
+    builder.AddGridWiseTelemetry("recommendation-worker");
     if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
         throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");
 
@@ -94,6 +99,7 @@ static async Task RunWorkerAsync(string[] args)
 static async Task<int> ReprocessDlqAsync(string[] args)
 {
     var builder = Host.CreateApplicationBuilder(args);
+    builder.AddGridWiseTelemetry("recommendation-dlq-reprocess");
     var bootstrapServers = builder.Configuration["Kafka:BootstrapServers"];
     if (string.IsNullOrEmpty(bootstrapServers))
         throw new InvalidOperationException("Kafka:BootstrapServers is not configured.");

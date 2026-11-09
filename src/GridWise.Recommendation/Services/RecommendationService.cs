@@ -6,6 +6,7 @@ using GridWise.Recommendation.Api;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Domain;
 using GridWise.Recommendation.Events;
+using GridWise.Recommendation.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -118,6 +119,7 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
                 EventVersion = 1,
                 Payload = payloadJson,
                 CorrelationId = correlationId,
+                TraceParent = Tracing.CurrentTraceParent(),
                 OccurredAt = now
             });
 
@@ -165,6 +167,7 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
             Payload = JsonSerializer.Serialize(
                 new PlanAcceptedV1(id, item.PlanId, item.PlanVersionNo, item.Total, now), Json),
             CorrelationId = correlationId,
+            TraceParent = Tracing.CurrentTraceParent(),
             OccurredAt = now
         });
 

@@ -3,6 +3,7 @@ using System.Text.Json;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Domain;
 using GridWise.Recommendation.Events;
+using GridWise.Recommendation.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
 namespace GridWise.Recommendation.Services;
@@ -89,6 +90,7 @@ public class BatchChunkProcessor(RecommendationDbContext db, PlanRanker ranker, 
                 EventVersion = 1,
                 Payload = JsonSerializer.Serialize(
                     new BatchChunkCompletedV1(chunk.JobId, chunk.ChunkNo, results, errors), Json),
+                TraceParent = Tracing.CurrentTraceParent(),
                 OccurredAt = now
             });
             await db.SaveChangesAsync(ct);

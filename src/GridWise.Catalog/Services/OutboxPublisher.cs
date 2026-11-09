@@ -2,6 +2,7 @@ using System.Text.Json;
 using Confluent.Kafka;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Events;
+using GridWise.Catalog.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
 namespace GridWise.Catalog.Services;
@@ -90,9 +91,16 @@ public class OutboxPublisher(
                 row.Id, row.EventType, row.EventVersion, row.OccurredAt, row.CorrelationId,
                 JsonSerializer.Deserialize<JsonElement>(row.Payload, Json));
 
+            // A child of the code that wrote the row; the Kafka message carries this span's context for the consumer.
+            using var publish = Tracing.StartPublish(row.TraceParent, topic, row.Id);
             await producer.ProduceAsync(
                 topic,
-                new Message<string, string> { Key = row.AggregateId, Value = JsonSerializer.Serialize(envelope, Json) },
+                new Message<string, string>
+                {
+                    Key = row.AggregateId,
+                    Value = JsonSerializer.Serialize(envelope, Json),
+                    Headers = Tracing.HeadersFor(publish, row.TraceParent)
+                },
                 ct);
 
             row.PublishedAt = time.GetUtcNow();

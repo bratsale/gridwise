@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using GridWise.Batch.Events;
 
@@ -14,8 +15,12 @@ public static class EventReader
     {
         try
         {
-            return JsonSerializer.Deserialize<EventEnvelope>(json, Json)
+            var envelope = JsonSerializer.Deserialize<EventEnvelope>(json, Json)
                 ?? throw new PoisonMessageException("Message is not an event envelope.");
+            Activity.Current?.SetTag("event.type", envelope.Type);
+            if (envelope.CorrelationId is not null)
+                Activity.Current?.SetTag("correlation.id", envelope.CorrelationId);
+            return envelope;
         }
         catch (JsonException ex)
         {

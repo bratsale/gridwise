@@ -12,6 +12,7 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.HasKey(m => m.Id);
 
         builder.Property(m => m.Payload).HasColumnType("jsonb");
+        builder.Property(m => m.TraceParent).HasMaxLength(55); // a W3C traceparent is always 55 characters
 
         builder.HasIndex(m => m.OccurredAt)
             .HasFilter("published_at IS NULL");

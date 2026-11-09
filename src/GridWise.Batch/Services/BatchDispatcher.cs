@@ -2,6 +2,7 @@ using System.Text.Json;
 using GridWise.Batch.Data;
 using GridWise.Batch.Domain;
 using GridWise.Batch.Events;
+using GridWise.Batch.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
 namespace GridWise.Batch.Services;
@@ -164,6 +165,11 @@ public class BatchDispatcher(
 
             // One transaction per chunk: Dispatched and its outbox row. The job row is locked and its status checked again,
             // so a cancel and a dispatch cannot interleave: after the cancel commits, nothing more is dispatched.
+            // The start of the chunk's trace: the outbox row stores this span, so the publish, the worker and the result are its children.
+            using var dispatch = Tracing.Source.StartActivity("dispatch chunk");
+            dispatch?.SetTag("job.id", jobId.ToString());
+            dispatch?.SetTag("chunk.no", chunk.ChunkNo);
+
             var done = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
                 db.ChangeTracker.Clear();
@@ -187,6 +193,7 @@ public class BatchDispatcher(
                     EventType = EventTypes.BatchChunkRequested,
                     EventVersion = 1,
                     Payload = payload,
+                    TraceParent = Tracing.CurrentTraceParent(),
                     OccurredAt = now
                 });
                 await db.SaveChangesAsync(ct);

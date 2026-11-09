@@ -5,6 +5,7 @@ using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Domain;
 using GridWise.Catalog.Events;
+using GridWise.Catalog.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -173,6 +174,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
                     tiers.Select(t => new PlanTierV1(t.Threshold, t.PricePerKwh)).ToList()),
                 Json),
             CorrelationId = correlationId,
+            TraceParent = Tracing.CurrentTraceParent(),
             OccurredAt = now
         });
 

@@ -27,6 +27,9 @@ services:
       ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw}
       Kafka__BootstrapServers: kafka:9092
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      OTEL_SERVICE_NAME: catalog
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     ports:
       - "${CATALOG_PORT:-5101}:8080"
     healthcheck:
@@ -67,6 +70,9 @@ services:
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      OTEL_SERVICE_NAME: recommendation
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     ports:
       - "${RECOMMENDATION_PORT:-5102}:8080"
     healthcheck:
@@ -92,6 +98,9 @@ services:
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      OTEL_SERVICE_NAME: recommendation-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     deploy:
       replicas: 2
     depends_on:
@@ -126,6 +135,9 @@ services:
       ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
       Kafka__BootstrapServers: kafka:9092
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      OTEL_SERVICE_NAME: batch
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     ports:
       - "${BATCH_PORT:-5103}:8080"
     healthcheck:
@@ -158,6 +170,22 @@ services:
         condition: service_healthy
       batch:
         condition: service_healthy
+
+  # Grafana, Tempo (traces), Loki (logs) and Prometheus/Mimir (metrics) in one container, with an OTLP receiver (4317 gRPC, 4318 HTTP).
+  # The services send to it inside the network; only Grafana is published. It is the heaviest part of the system: about 0.6 GB of memory (measured when idle; it grows with the amount of data kept)
+  # and an image of about 1 GB. Nothing depends on it, so the services also run when it is stopped.
+  otel-lgtm:
+    image: ${OTEL_LGTM_IMAGE:-grafana/otel-lgtm:0.40.0}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - otel-lgtm-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health > /dev/null && curl -fsS http://localhost:3200/ready > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
 
   kafka:
     image: ${KAFKA_IMAGE:-apache/kafka:4.4.0}
@@ -216,3 +244,4 @@ volumes:
   recommendation-db-data:
   batch-db-data:
   kafka-data:
+  otel-lgtm-data:
