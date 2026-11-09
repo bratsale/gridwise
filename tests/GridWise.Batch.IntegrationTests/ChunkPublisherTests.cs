@@ -40,7 +40,7 @@ public class ChunkPublisherTests(BatchFactory factory, KafkaFixture kafka) : ICl
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     [Fact]
-    public async Task Chunks_are_published_once_to_batch_chunks_with_the_job_id_as_key()
+    public async Task Chunks_are_published_once_to_batch_chunks_with_jobId_and_chunkNo_as_key()
     {
         var csv = "customer_id,consumption_kwh,tax_group\n" + string.Concat(Enumerable.Range(1, 1200).Select(i => $"c{i},1,a\n"));
         var form = new MultipartFormDataContent { { new ByteArrayContent(Encoding.UTF8.GetBytes(csv)), "file", "c.csv" } };
