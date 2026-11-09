@@ -1,0 +1,71 @@
+name: Promote
+
+# Deploys images that are already built (by commit SHA) to qa or prod. Promotion and rollback are the same operation:
+# promoting is deploying a newer SHA, rolling back is deploying an older one. Nothing is built here.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        type: choice
+        options: [qa, prod]
+      tag:
+        description: Commit SHA whose images to deploy (the full 40 characters)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Two deployments to the same environment must not run at once.
+concurrency:
+  group: promote-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      # Repository secrets named <ENVIRONMENT>_<NAME>, for example QA_CATALOG_DB_PASSWORD; the dev defaults when a secret is not set.
+      CATALOG_DB_PASSWORD: ${{ secrets[format('{0}_CATALOG_DB_PASSWORD', inputs.environment)] || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets[format('{0}_RECOMMENDATION_DB_PASSWORD', inputs.environment)] || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets[format('{0}_BATCH_DB_PASSWORD', inputs.environment)] || 'batch_dev_pw' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Fails early, with a clear message, when the SHA was never built (a typo, a branch other than main, a deleted package).
+      - name: Check that the images exist
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The tag must be a full commit SHA (40 lowercase hexadecimal characters), got '$TAG'"
+            exit 1
+          fi
+          missing=0
+          for service in catalog recommendation batch web; do
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise/$service:$TAG"
+            if docker manifest inspect "$image" > /dev/null 2>&1; then
+              echo "found   $image"
+            else
+              echo "::error::Image not found: $image"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - uses: ./.github/actions/deploy
+        with:
+          environment: ${{ inputs.environment }}
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}

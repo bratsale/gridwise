@@ -4,18 +4,6 @@ on:
   push:
     branches: ['**']
   pull_request:
-  # Rollback: deploy an earlier commit's images (already in ghcr.io) to one environment. Nothing is rebuilt.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Image tag to deploy, a commit SHA that was built by this pipeline
-        required: true
-        type: string
-      environment:
-        description: Environment to deploy to
-        required: true
-        type: choice
-        options: [dev, qa, prod]
 
 permissions:
   contents: read
@@ -26,7 +14,6 @@ env:
 
 jobs:
   backend:
-    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +32,6 @@ jobs:
           if-no-files-found: warn
 
   web:
-    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -151,81 +137,22 @@ jobs:
           export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
           docker compose down -v
 
-  # Promotion: the same images, one environment after the other. Required reviewers on the qa and prod
-  # GitHub environments make the pipeline wait for an approval before those jobs start (docs/deployment.md).
+  # The only automatic deployment. qa and prod are deployed by hand with .github/workflows/promote.yml
+  # (the same images, chosen by commit SHA), because approvals need GitHub environments, which this plan does not have.
   deploy-dev:
     needs: e2e
     runs-on: ubuntu-latest
-    environment: dev
     permissions:
       contents: read
       packages: read
     env:
-      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
-      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
-      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+      CATALOG_DB_PASSWORD: ${{ secrets.DEV_CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
+      RECOMMENDATION_DB_PASSWORD: ${{ secrets.DEV_RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
+      BATCH_DB_PASSWORD: ${{ secrets.DEV_BATCH_DB_PASSWORD || 'batch_dev_pw' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/deploy
         with:
           environment: dev
           tag: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-qa:
-    needs: deploy-dev
-    runs-on: ubuntu-latest
-    environment: qa
-    permissions:
-      contents: read
-      packages: read
-    env:
-      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
-      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
-      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/deploy
-        with:
-          environment: qa
-          tag: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-prod:
-    needs: deploy-qa
-    runs-on: ubuntu-latest
-    environment: prod
-    permissions:
-      contents: read
-      packages: read
-    env:
-      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
-      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
-      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/deploy
-        with:
-          environment: prod
-          tag: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  # Rollback: only runs when started by hand. The environment is chosen by the input, so its approvals and secrets apply.
-  rollback:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    permissions:
-      contents: read
-      packages: read
-    env:
-      CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
-      RECOMMENDATION_DB_PASSWORD: ${{ secrets.RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
-      BATCH_DB_PASSWORD: ${{ secrets.BATCH_DB_PASSWORD || 'batch_dev_pw' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/deploy
-        with:
-          environment: ${{ inputs.environment }}
-          tag: ${{ inputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
