@@ -486,3 +486,4 @@ CLAUDE.md
 .mcp.json
 src/GridWise.Web/node_modules
 src/GridWise.Web/dist
+*.zip
