@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Confluent.Kafka;
 using GridWise.Batch.Events;
 
@@ -57,12 +58,15 @@ public class BatchResultsConsumer(
                 await MessageProcessing.ProcessAsync(consumer, producer, message, async ct =>
                 {
                     using var scope = scopeFactory.CreateScope();
+                    var started = Stopwatch.GetTimestamp();
                     var outcome = await scope.ServiceProvider.GetRequiredService<BatchResultHandler>()
                         .HandleAsync(message.Message.Value, ct);
+                    var elapsed = Stopwatch.GetElapsedTime(started);
 
                     var level = outcome is ResultOutcome.Applied or ResultOutcome.Duplicate ? LogLevel.Debug : LogLevel.Warning;
-                    logger.Log(level, "Result {Key} ({Topic}[{Partition}]@{Offset}): {Outcome}",
-                        message.Message.Key, message.Topic, message.Partition.Value, message.Offset.Value, outcome);
+                    logger.Log(level, "Result {Key} ({Topic}[{Partition}]@{Offset}): {Outcome} in {ElapsedMs} ms",
+                        message.Message.Key, message.Topic, message.Partition.Value, message.Offset.Value, outcome,
+                        elapsed.TotalMilliseconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture));
                 }, time, logger, stoppingToken);
             }
         }

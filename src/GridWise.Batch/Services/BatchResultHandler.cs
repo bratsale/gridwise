@@ -2,6 +2,8 @@ using GridWise.Batch.Data;
 using GridWise.Batch.Domain;
 using GridWise.Batch.Events;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace GridWise.Batch.Services;
 
@@ -16,7 +18,7 @@ public enum ResultOutcome
     SkippedUnknownType
 }
 
-/// <summary>Stores the result of one chunk and completes the job when it was the last one, all in one transaction.</summary>
+/// <summary>Stores the result of one chunk and completes the job when it was the last one, all in one transaction (the rows are written with COPY).</summary>
 public class BatchResultHandler(BatchDbContext db, TimeProvider time)
 {
     // Virtual so that tests can simulate failures.
@@ -58,12 +60,11 @@ public class BatchResultHandler(BatchDbContext db, TimeProvider time)
                 return status == ChunkStatus.Completed ? ResultOutcome.Duplicate : ResultOutcome.UnknownChunk;
             }
 
-            db.JobResults.AddRange(e.Results.Select(r => new JobResult
-            {
-                JobId = e.JobId, Line = r.Line, CustomerId = r.CustomerId, PlanId = r.PlanId, PlanVersionNo = r.PlanVersionNo,
-                PlanName = r.PlanName, Total = r.Total, TaxGroupVersionNo = r.TaxGroupVersionNo
-            }));
-            db.JobErrors.AddRange(e.Errors.Select(r => new JobError { JobId = e.JobId, Line = r.Line, Error = r.Error }));
+            // Binary COPY on the connection of this transaction: one round trip for all the rows of the chunk instead of
+            // an INSERT for each. The primary keys (job_id, line) still reject a line that was stored before.
+            var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+            await CopyResultsAsync(connection, e, ct);
+            await CopyErrorsAsync(connection, e, ct);
             job.ProcessedRows += e.Results.Count;
             job.FailedRows += e.Errors.Count;
 
@@ -74,9 +75,47 @@ public class BatchResultHandler(BatchDbContext db, TimeProvider time)
                 job.FinishedAt = now;
             }
 
-            await db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct); // the job row: counters and, for the last chunk, the status
             await transaction.CommitAsync(ct);
             return ResultOutcome.Applied;
         });
+    }
+
+    private static async Task CopyResultsAsync(NpgsqlConnection connection, BatchChunkCompletedV1 e, CancellationToken ct)
+    {
+        if (e.Results.Count == 0)
+            return;
+
+        await using var import = await connection.BeginBinaryImportAsync(
+            "COPY job_results (job_id, line, customer_id, plan_id, plan_version_no, plan_name, total, tax_group_version_no) FROM STDIN (FORMAT BINARY)", ct);
+        foreach (var r in e.Results)
+        {
+            await import.StartRowAsync(ct);
+            await import.WriteAsync(e.JobId, NpgsqlDbType.Uuid, ct);
+            await import.WriteAsync(r.Line, NpgsqlDbType.Integer, ct);
+            await import.WriteAsync(r.CustomerId, NpgsqlDbType.Varchar, ct);
+            await import.WriteAsync(r.PlanId, NpgsqlDbType.Uuid, ct);
+            await import.WriteAsync(r.PlanVersionNo, NpgsqlDbType.Integer, ct);
+            await import.WriteAsync(r.PlanName, NpgsqlDbType.Varchar, ct);
+            await import.WriteAsync(r.Total, NpgsqlDbType.Numeric, ct);
+            await import.WriteAsync(r.TaxGroupVersionNo, NpgsqlDbType.Integer, ct);
+        }
+        await import.CompleteAsync(ct);
+    }
+
+    private static async Task CopyErrorsAsync(NpgsqlConnection connection, BatchChunkCompletedV1 e, CancellationToken ct)
+    {
+        if (e.Errors.Count == 0)
+            return;
+
+        await using var import = await connection.BeginBinaryImportAsync("COPY job_errors (job_id, line, error) FROM STDIN (FORMAT BINARY)", ct);
+        foreach (var r in e.Errors)
+        {
+            await import.StartRowAsync(ct);
+            await import.WriteAsync(e.JobId, NpgsqlDbType.Uuid, ct);
+            await import.WriteAsync(r.Line, NpgsqlDbType.Integer, ct);
+            await import.WriteAsync(r.Error, NpgsqlDbType.Varchar, ct);
+        }
+        await import.CompleteAsync(ct);
     }
 }

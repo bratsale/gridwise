@@ -144,6 +144,57 @@ public class ResultHandlerTests(BatchFactory factory)
         Assert.Equal(ChunkStatus.Pending, (await _t.GetChunks(jobId)).Single(c => c.ChunkNo == pending.ChunkNo).Status);
     }
 
+    private static string RawResult(Guid jobId, params (int Line, string CustomerId, string PlanName)[] rows)
+        => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            id = Guid.NewGuid(), type = "BatchChunkCompleted", version = 1, timestamp = DateTimeOffset.UtcNow, correlationId = (string?)null,
+            data = new
+            {
+                jobId, chunkNo = 1,
+                results = rows.Select(r => new
+                {
+                    line = r.Line, customerId = r.CustomerId, planId = Guid.Parse("5eed0000-0000-0000-0000-000000000001"),
+                    planVersionNo = 1, planName = r.PlanName, total = 1234567.89m, taxGroupVersionNo = 1
+                }),
+                errors = Array.Empty<object>()
+            }
+        });
+
+    [Fact]
+    public async Task Texts_and_amounts_are_stored_exactly_as_they_arrive()
+    {
+        var jobId = await _t.UploadAndDispatch(3);
+        var customer = "a,\"b\"\nc ščđćž ñ 日本";
+        var longest = new string('x', 100);
+
+        await _t.Handle(RawResult(jobId, (2, customer, "Plan \"Plus\", ž"), (3, longest, longest)));
+
+        var rows = await _t.InDb(db => db.JobResults.AsNoTracking().Where(r => r.JobId == jobId).OrderBy(r => r.Line).ToListAsync());
+        Assert.Equal([customer, longest], rows.Select(r => r.CustomerId));
+        Assert.Equal(["Plan \"Plus\", ž", longest], rows.Select(r => r.PlanName));
+        Assert.All(rows, r => Assert.Equal(1234567.89m, r.Total));
+        Assert.Equal(2, (await _t.GetJob(jobId)).ProcessedRows);
+    }
+
+    [Fact]
+    public async Task A_failure_while_writing_the_rows_rolls_back_the_whole_chunk()
+    {
+        var jobId = await _t.UploadAndDispatch(3);
+
+        // The same line twice: the second row breaks the primary key in the middle of the COPY.
+        await Assert.ThrowsAnyAsync<Exception>(() => _t.Handle(RawResult(jobId, (2, "c2", "Standard"), (2, "c2 again", "Standard"))));
+
+        var job = await _t.GetJob(jobId);
+        Assert.Equal(JobStatus.Running, job.Status);
+        Assert.Equal(0, job.ProcessedRows);
+        Assert.Equal(ChunkStatus.Dispatched, Assert.Single(await _t.GetChunks(jobId)).Status); // the chunk update is rolled back too
+        Assert.Equal(0, await _t.InDb(db => db.JobResults.CountAsync(r => r.JobId == jobId)));
+
+        // And the chunk can still be completed by a correct message.
+        Assert.Equal(ResultOutcome.Applied, await _t.Handle(ResultTestSupport.Completed(jobId, 1, 3, 0)));
+        Assert.Equal(JobStatus.Completed, (await _t.GetJob(jobId)).Status);
+    }
+
     [Fact]
     public async Task Other_event_types_are_skipped_and_unreadable_messages_are_poison()
     {

@@ -81,7 +81,7 @@ Both leave the stack with the default of 2 workers (the throughput script also w
   (batch.chunks, read by the workers) and `batch` (batch.results, read by the Batch service) and the unsent outbox rows of both services.
 - Settings are the defaults: chunks of 500 rows, at most 20 chunks of a job in flight, 6 partitions for `batch.chunks`, 2 active plans in the read model.
 
-## Results
+## Results before the improvements
 
 Hardware: Intel Core i5-5300U (2 cores, 4 threads, 2.3 GHz), 7.6 GiB RAM. The whole stack (nginx, three services, three PostgreSQL
 databases, Kafka, the workers) and the test script run on this one machine. 2026-11-09.
@@ -95,9 +95,9 @@ databases, Kafka, the workers) and the test script run on this one machine. 2026
 
 About 2,500 rows per second (5 chunks per second), **with 1 worker and with 3**. Three workers do not make it faster.
 
-## What limits the speed
+## What limited the speed before
 
-The workers are not the limit; the single consumer of results in the Batch service is. What the measurements show:
+The workers were not the limit; the single consumer of results in the Batch service was. What the measurements showed:
 
 | Observation | 1 worker | 3 workers |
 |---|---|---|
@@ -129,11 +129,10 @@ recommendation database is not busy. But the work that all workers feed into is 
 helps when the workers are the slowest part (for example with many active plans, where pricing one row takes longer). Here they are not.
 Three workers were even slightly slower in the first run (47 s), because of the rebalancing and the extra load on a machine that is already busy.
 
-**What would make it faster** (not done, this step changes no behaviour): write the results of a chunk with one multi-row statement instead of
-Entity Framework inserts, or key `batch.results` by `{jobId}:{chunkNo}` so that several Batch consumers can apply results in parallel (the job row lock
-would then be the next limit, and the counters could be summed at the end instead).
+**What would make it faster:** write the results of a chunk with one COPY instead of Entity Framework inserts (done, see below). Keying `batch.results` by
+`{jobId}:{chunkNo}` would not have helped: see "Why keying by chunk would not have helped" below.
 
-## Resilience: a worker dies in the middle of a job
+## Resilience before: a worker dies in the middle of a job
 
 `scripts/resilience-batch-worker.sh` starts 2 workers, uploads the 100,000-row file, waits until about 20% of the chunks are completed, kills one worker
 with `docker kill`, waits for `Completed` (timeout 15 minutes) and then checks, with exit code 1 if anything is wrong:
@@ -151,3 +150,85 @@ worker are assigned to the other one only after the consumer group notices that 
 progress was 36 s. A second run gave the same result (killed after 10 s at 42 of 200 chunks, completed after 77 s, longest pause 36 s, all checks passed). Nothing was lost and nothing was counted twice: a chunk that the dead worker had not committed was delivered again and processed once,
 and a chunk it had committed but not acknowledged was recognized by `processed_chunks` and only acknowledged. The script brings the killed worker back
 at the end (`docker compose up -d recommendation-worker`). The sequence is drawn in [../architecture/flows.md](../architecture/flows.md) (3c).
+
+## After: faster result writes and faster failover
+
+Two changes, measured with the same scripts on the same machine (2026-11-09, a few hours later).
+
+1. **Results written with binary COPY.** `BatchResultHandler` used to add the `job_results` and `job_errors` rows with Entity Framework
+   (`AddRange`, which sends about 500 INSERT statements per chunk in batches). It now uses Npgsql binary `COPY` (`BeginBinaryImportAsync`) on the same connection
+   and in the same transaction: one round trip for all the rows of a chunk. Nothing else changed: the job row lock, the cancelled check, the
+   `UPDATE chunks ... WHERE status = 'Dispatched'` that deduplicates, the counters and the completion of the job are still in that one transaction, and a
+   failure while writing (for example a line that was stored before) still rolls all of it back. Two new tests check that and the exact storage of quotes,
+   line breaks and non-ASCII text.
+2. **Failover of a dead worker.** The `batch-workers` consumer now uses `SessionTimeoutMs` 10000 and `HeartbeatIntervalMs` 3000
+   (settings `Kafka:SessionTimeoutMs` and `Kafka:HeartbeatIntervalMs`), instead of the 45 s default. The trade-off: a worker that stalls for more than
+   10 seconds without heartbeats is taken for dead and its partitions are given to the others (a rebalance). The chunk it was working on is then delivered
+   again, which `processed_chunks` makes harmless, but it costs work and a pause. Heartbeats come from a background thread, so a slow chunk alone does not trigger it.
+
+### Handler time
+
+The consumer now logs the time of every `BatchResultHandler` call (Debug level, `Result ... in N ms`). 100,000-row job, 2 workers, three jobs each; the EF command
+log was switched off for these runs so that logging does not slow the consumer.
+
+| | Mean per chunk | Median | 95th percentile | Handler busy / job time | Job time (200 chunks) |
+|---|---|---|---|---|---|
+| Before (EF inserts) | 142-190 ms, **166 ms** over the 3 runs | 128-173 ms | 229-357 ms | 28.3 / 30.9 s, 33.2 / 35.3 s, 38.0 / 40.3 s (92-94% busy) | 30.9, 35.3, 40.3 s |
+| After (COPY) | 84-101 ms, **93 ms** over the 3 runs | 68-86 ms | 168-196 ms | 16.9 / 23.4 s, 19.0 / 25.7 s, 20.2 / 24.7 s (72-82% busy) | 23.4, 25.7, 24.7 s |
+
+The handler is 44% faster and the job about 30% shorter. The consumer was busy 92-94% of the job before and 72-82% after, so it is no longer completely
+saturated, but it is still the busiest single stage.
+
+### Throughput
+
+Same script and file as before (`bash scripts/perf/batch-throughput.sh`).
+
+| Workers | Run | Seconds before | Rows/s before | Seconds after | Rows/s after |
+|---|---|---|---|---|---|
+| 1 | 1 | 41.2 | 2,424 | 36.7 | 2,724 |
+| 1 | 2 | 38.1 | 2,623 | 32.2 | 3,105 |
+| 3 | 1 | 47.0 | 2,129 | 35.6 | 2,812 |
+| 3 | 2 | 39.8 | 2,510 | 29.2 | 3,429 |
+| 1 | mean | 39.7 | 2,524 | 34.5 | 2,915 (+15%) |
+| 3 | mean | 43.4 | 2,320 | 32.4 | 3,120 (+34%) |
+
+The speed-up is real but smaller than the handler's 44%, and the runs vary by about +-15% on this machine. Two things to know when reading the table:
+the script's snapshot (`docker stats`, two JVM tools for the consumer lag) takes several seconds of CPU in the middle of every run, in both the before and the after
+runs, and the clean 2-worker runs above (no snapshot) took 23-26 s, i.e. about 4,000 rows/s. And one worker is still as fast as three.
+
+With a window of 60 instead of 20 (`Batch__WindowSize=60`, two runs each, configuration only): 1 worker 26.5 and 30.0 s, 3 workers 30.9 and 26.8 s,
+i.e. 3,200-3,800 rows/s, about 15% better than with 20. Before the change the window made no difference.
+
+### Where the bottleneck is now
+
+- **The queue in front of the Batch consumer is gone.** The lag of the `batch` group at the 12 s snapshot was 8, 0, 0 and 0 messages with the default window
+  (it was 14-17), and 0, 21, 13 and 0 with a window of 60 (it was 46-53). The lag of `batch-workers` was 0-2.
+- **The stack as a whole is now close to the machine's limit.** Sampled over whole runs (`vmstat`, `docker stats`): the host was 14-18% idle and 4-9% in I/O wait,
+  with user 50-60% and system 16%. Kafka alone used 60-72% of a thread (peaks of 143-161%), the Batch service 25-62% (up to 109%), `batch-db` 26-30%,
+  `recommendation-db` 10-12%. With one worker the worker used only 13% on average. So the workers are still not the limit; the three databases, Kafka and
+  the Batch service share two physical cores.
+- **The serial stages are still the most loaded part.** All of them are in the Batch service and run one after the other: the consumer applies a result in
+  about 93 ms (busy 72-82% of the job), the dispatcher reads and parses the 2.6 MB file again at every step, and each outbox publisher sends one message at a time
+  with a commit for each. The polling intervals (1 s) add to the round trip of a chunk, which is why a bigger window still helps a little. I did not measure
+  inside the consumer which part of the 93 ms is left (the row lock, the two COPYs, the counters, the commit), so I cannot say what the next step is.
+- **Why more workers still do not help.** One worker already prices a chunk faster than the chain in front of and behind it can deliver chunks (it used 13% of a
+  thread), so extra workers have nothing to take over. They help when pricing is the slow part, for example with many plans per row, or on a machine with more cores.
+
+### Why keying `batch.results` by chunk would not have helped
+
+The idea was to key results by `{jobId}:{chunkNo}` instead of the job id, so that they spread over the 3 partitions of `batch.results` and are applied in parallel.
+It would not have helped for three reasons: (1) there is one Batch service with one results consumer, which takes messages one by one whatever the number of partitions,
+so spreading them over partitions only changes which partition the one consumer reads from; (2) even with several consumers, every result of a job locks the same
+job row (`SELECT ... FOR UPDATE`, which keeps the counters, the cancel and the completion correct), so the results of one job would still be applied one after another;
+(3) the time is spent inside the handler (166 ms per chunk before), not in waiting for a partition, which is why making the handler faster did help.
+
+### Resilience after
+
+`bash scripts/resilience-batch-worker.sh`, two runs, both passed all six checks (the same counts as before: 99,016 + 984 = 100,000 rows, 200 of 200 chunks, 200 rows in `processed_chunks`).
+
+| | Worker killed at | Job completed after | Longest pause without progress | Checks |
+|---|---|---|---|---|
+| Before (session timeout 45 s) | 29 s (43/200) and 10 s (42/200) | 92 s and 77 s | 36 s | passed |
+| After (session timeout 10 s) | 7 s (40/200) and 12 s (45/200) | 35 s and 36 s | 3 s and 4 s | passed |
+
+A killed worker now costs seconds instead of the better part of a minute.

@@ -12,6 +12,15 @@ public class BatchWorker(
 {
     public const string GroupId = "batch-workers";
 
+    // How fast a dead worker is noticed. The broker waits this long without a heartbeat before it takes the partitions of a worker
+    // away and gives them to the others (the librdkafka default is 45 s, so a killed worker held up its chunks for that long).
+    // The trade-off: a worker that stalls for longer than this (a long GC pause, a starved or frozen container, a network hiccup)
+    // is also taken for dead. That triggers a rebalance, and a chunk it was working on is delivered again to another worker;
+    // processed_chunks makes that harmless, it only costs some work. Heartbeats come from a background thread, so a slow chunk
+    // alone does not trigger it. Both values can be set with Kafka:SessionTimeoutMs and Kafka:HeartbeatIntervalMs.
+    public const int DefaultSessionTimeoutMs = 10_000;
+    public const int DefaultHeartbeatIntervalMs = 3_000;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
@@ -21,6 +30,8 @@ public class BatchWorker(
         {
             BootstrapServers = bootstrapServers,
             GroupId = GroupId,
+            SessionTimeoutMs = config.GetValue("Kafka:SessionTimeoutMs", DefaultSessionTimeoutMs),
+            HeartbeatIntervalMs = config.GetValue("Kafka:HeartbeatIntervalMs", DefaultHeartbeatIntervalMs),
             EnableAutoCommit = false,
             AutoOffsetReset = AutoOffsetReset.Earliest
         }).Build();
