@@ -17,15 +17,15 @@ public class TracingTests(RecommendationFactory factory, KafkaFixture kafka) : I
     public async Task Consumer_continues_the_trace_of_the_message()
     {
         using var traces = new TraceCapture();
-        var (traceParent, traceId) = TraceCapture.NewRemoteTrace();
         var planId = Guid.NewGuid();
-        await Produce(planId.ToString(), CatalogEventHandlerTests.PlanEnvelope(planId), traceParent);
+        await Produce(planId.ToString(), CatalogEventHandlerTests.PlanEnvelope(planId), traces.TraceParent);
 
         await using var running = await Run();
-        await Eventually(() => traces.Stopped.Any(a => a.OperationName == "process" && a.ParentId == traceParent));
+        await Eventually(() => traces.Stopped.Any(a => a.OperationName == "process"));
 
-        var process = traces.Stopped.First(a => a.OperationName == "process" && a.ParentId == traceParent);
-        Assert.Equal(traceId, process.TraceId.ToHexString());
+        var process = traces.Stopped.Single(a => a.OperationName == "process");
+        Assert.Equal(traces.TraceParent, process.ParentId);
+        Assert.Equal(traces.TraceId, process.TraceId.ToHexString());
         Assert.Equal(Topics.CatalogPlanEvents, process.GetTagItem("messaging.destination.name"));
     }
 
@@ -33,15 +33,14 @@ public class TracingTests(RecommendationFactory factory, KafkaFixture kafka) : I
     public async Task Dead_lettered_message_keeps_the_trace_for_reprocessing()
     {
         using var traces = new TraceCapture();
-        var (traceParent, traceId) = TraceCapture.NewRemoteTrace();
         var planId = Guid.NewGuid();
-        await Produce(planId.ToString(), CatalogEventHandlerTests.PlanEnvelope(planId, envelopeVersion: 99), traceParent);
+        await Produce(planId.ToString(), CatalogEventHandlerTests.PlanEnvelope(planId, envelopeVersion: 99), traces.TraceParent);
 
         await using var running = await Run();
         var dead = ConsumeDlq(planId.ToString());
 
         var header = Encoding.UTF8.GetString(dead.Message.Headers.GetLastBytes("traceparent"));
-        Assert.StartsWith($"00-{traceId}-", header);
+        Assert.StartsWith($"00-{traces.TraceId}-", header);
     }
 
     private async Task Produce(string key, string value, string traceParent)

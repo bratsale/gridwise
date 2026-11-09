@@ -28,6 +28,7 @@ public class TracingTests(BatchFactory factory, KafkaFixture kafka) : IClassFixt
         using var scope = factory.Services.CreateScope();
         var row = await scope.ServiceProvider.GetRequiredService<BatchDbContext>()
             .OutboxMessages.AsNoTracking().SingleAsync(m => m.AggregateId == $"{jobId}:1");
+        Assert.Equal(traces.TraceParent, dispatch.ParentId); // a child of the test's root span
         Assert.Equal(dispatch.Id, row.TraceParent);
     }
 
@@ -35,7 +36,6 @@ public class TracingTests(BatchFactory factory, KafkaFixture kafka) : IClassFixt
     public async Task Results_consumer_continues_the_trace_of_the_result_message()
     {
         using var traces = new TraceCapture();
-        var (traceParent, traceId) = TraceCapture.NewRemoteTrace();
         var jobId = await _t.UploadAndDispatch(3);
         using (var producer = new ProducerBuilder<string, string>(new ProducerConfig { BootstrapServers = kafka.BootstrapServers }).Build())
         {
@@ -43,7 +43,7 @@ public class TracingTests(BatchFactory factory, KafkaFixture kafka) : IClassFixt
             {
                 Key = jobId.ToString(),
                 Value = ResultTestSupport.Completed(jobId, 1, 2, 1),
-                Headers = new Headers { { "traceparent", Encoding.UTF8.GetBytes(traceParent) } }
+                Headers = new Headers { { "traceparent", Encoding.UTF8.GetBytes(traces.TraceParent) } }
             });
         }
 
@@ -55,7 +55,7 @@ public class TracingTests(BatchFactory factory, KafkaFixture kafka) : IClassFixt
         try
         {
             var deadline = DateTime.UtcNow + Timeout;
-            while (!traces.Stopped.Any(a => a.OperationName == "process" && a.ParentId == traceParent))
+            while (!traces.Stopped.Any(a => a.OperationName == "process"))
             {
                 Assert.True(DateTime.UtcNow < deadline, "No process span arrived in time.");
                 await Task.Delay(250);
@@ -66,7 +66,8 @@ public class TracingTests(BatchFactory factory, KafkaFixture kafka) : IClassFixt
             await consumer.StopAsync(CancellationToken.None);
         }
 
-        var process = traces.Stopped.First(a => a.OperationName == "process" && a.ParentId == traceParent);
-        Assert.Equal(traceId, process.TraceId.ToHexString());
+        var process = traces.Stopped.Single(a => a.OperationName == "process");
+        Assert.Equal(traces.TraceParent, process.ParentId);
+        Assert.Equal(traces.TraceId, process.TraceId.ToHexString());
     }
 }

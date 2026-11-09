@@ -36,24 +36,22 @@ public class TracingTests(CatalogFactory factory, KafkaFixture kafka) : IClassFi
     public async Task Outbox_row_gets_the_traceparent_of_the_request()
     {
         using var traces = new TraceCapture();
-        var (traceParent, traceId) = TraceCapture.NewRemoteTrace();
 
-        var planId = await CreatePlan(traceParent);
+        var planId = await CreatePlan(traces.TraceParent);
 
         using var scope = factory.Services.CreateScope();
         var row = await scope.ServiceProvider.GetRequiredService<CatalogDbContext>()
             .OutboxMessages.AsNoTracking().SingleAsync(m => m.AggregateId == planId.ToString());
         Assert.NotNull(row.TraceParent);
-        Assert.StartsWith($"00-{traceId}-", row.TraceParent);      // the same trace ...
-        Assert.NotEqual(traceParent, row.TraceParent);             // ... a span of this service inside it
+        Assert.StartsWith($"00-{traces.TraceId}-", row.TraceParent);   // the same trace ...
+        Assert.NotEqual(traces.TraceParent, row.TraceParent);           // ... a span of this service inside it
     }
 
     [Fact]
     public async Task Publisher_starts_a_publish_span_under_the_stored_context_and_sends_it_as_a_header()
     {
         using var traces = new TraceCapture();
-        var (traceParent, traceId) = TraceCapture.NewRemoteTrace();
-        var planId = await CreatePlan(traceParent);
+        var planId = await CreatePlan(traces.TraceParent);
 
         string storedTraceParent;
         using (var scope = factory.Services.CreateScope())
@@ -75,7 +73,7 @@ public class TracingTests(CatalogFactory factory, KafkaFixture kafka) : IClassFi
         }
 
         var publish = traces.Stopped.Single(a => a.OperationName == "publish" && a.ParentId == storedTraceParent);
-        Assert.Equal(traceId, publish.TraceId.ToHexString());
+        Assert.Equal(traces.TraceId, publish.TraceId.ToHexString());
 
         var message = Consume(planId.ToString());
         var header = Encoding.UTF8.GetString(message.Message.Headers.GetLastBytes("traceparent"));
