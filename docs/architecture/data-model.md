@@ -1,6 +1,6 @@
 # Data model
 
-Each service has its own PostgreSQL database and nobody else reads or writes it
+Each service has its own PostgreSQL database (three: `catalog`, `recommendation`, `batch`) and nobody else reads or writes it
 ([ADR 0008](../decisions/0008-service-boundaries.md)). Tables and columns come from the EF Core configurations and the migrations
 (`src/GridWise.*/Data/Configurations`, `src/GridWise.*/Migrations`); column names are snake_case.
 `numeric(p,s)` precisions are in the column comments. Back to [architecture](README.md).
@@ -126,9 +126,14 @@ erDiagram
         int plan_version_no
         timestamptz accepted_at
     }
+    processed_chunks {
+        uuid job_id PK "id of a batch job, not a foreign key"
+        int chunk_no PK
+        timestamptz processed_at
+    }
     outbox_messages {
         uuid id PK
-        text aggregate_type "recommendation"
+        text aggregate_type "recommendation or batch-chunk-result"
         text aggregate_id
         text event_type
         int event_version
@@ -145,4 +150,78 @@ erDiagram
 | `tax_group_versions` | The same for tax groups, filled from `catalog.tax-group-events`. Primary key `(code, version_no)`. |
 | `recommendations` | One row per calculation. It records the consumption, the tax group code and version used, and `items` (jsonb): the ranked list of plan id, plan version, name and total, which gives the plan versions used. The per-tier breakdown is not stored; it is recalculated on read from the stored versions ([ADR 0007](../decisions/0007-recommendation-durability-and-storage.md)). A row is never updated. The links to the plan and tax group versions are logical (`tax_group_code` + `tax_group_version_no`, plan ids inside `items`), not foreign keys. |
 | `acceptances` | At most one per recommendation: the primary key is `recommendation_id`, which is also a foreign key to `recommendations` (`ON DELETE RESTRICT`). Two parallel accepts collide on the key; the loser reads the winner's row and gets 200 (same plan) or 409 (another plan). It stores the accepted plan and its version number. |
-| `outbox_messages` | The same outbox structure as in the catalog, for `RecommendationCalculated` and `PlanAccepted`, with the same filtered index `ix_outbox_messages_occurred_at` (`WHERE published_at IS NULL`). A recommendation or acceptance row is saved in the same transaction as its outbox row. Recommendations are saved with `synchronous_commit` off (ADR 0007): if the database crashes the row and its event are lost together, so the data stays consistent. |
+| `processed_chunks` | Written only by the batch workers: one row for every chunk of a batch job that was priced. Primary key `(job_id, chunk_no)`. A worker inserts it with `ON CONFLICT DO NOTHING` as the first step of the chunk's transaction: when no row is inserted the chunk was already processed, and nothing else is written. The row exists only if the transaction commits, together with the result's outbox row, so a worker killed mid-chunk leaves nothing behind. `job_id` points to a job in the batch database, so it is not a foreign key. |
+| `outbox_messages` | The same outbox structure as in the catalog, for `RecommendationCalculated` and `PlanAccepted` (aggregate type `recommendation`) and for `BatchChunkCompleted` (aggregate type `batch-chunk-result`, key = job id, written by the workers), with the same filtered index `ix_outbox_messages_occurred_at` (`WHERE published_at IS NULL`). A recommendation or acceptance row is saved in the same transaction as its outbox row. Recommendations are saved with `synchronous_commit` off (ADR 0007): if the database crashes the row and its event are lost together, so the data stays consistent. |
+
+## Batch database (`batch`)
+
+Owned by the batch service. A job is an uploaded file; it is split into chunks, and the answers come back as results and errors per row.
+The tables are in `src/GridWise.Batch/Data/Configurations` and `src/GridWise.Batch/Migrations`.
+
+```mermaid
+erDiagram
+    jobs ||--|| job_files : "has one file"
+    jobs ||--o{ chunks : "is split into"
+    jobs ||--o{ job_results : "has results"
+    jobs ||--o{ job_errors : "has errors"
+
+    jobs {
+        uuid id PK "UUID v7"
+        varchar_20 status "Pending, Running, Completed, Cancelled or Failed"
+        varchar_255 file_name
+        int total_rows
+        int processed_rows "rows with a result"
+        int failed_rows "rows with an error"
+        timestamptz created_at "index"
+        timestamptz started_at "nullable"
+        timestamptz finished_at "nullable"
+    }
+    job_files {
+        uuid job_id PK, FK
+        bytea content "the uploaded CSV"
+    }
+    chunks {
+        uuid job_id PK, FK
+        int chunk_no PK "starts at 1"
+        int first_line "line number in the file"
+        int row_count
+        varchar_20 status "Pending, Dispatched or Completed"
+        timestamptz dispatched_at "nullable"
+        timestamptz completed_at "nullable"
+    }
+    job_results {
+        uuid job_id PK, FK
+        int line PK "line number in the file"
+        varchar_100 customer_id
+        uuid plan_id
+        int plan_version_no
+        varchar_100 plan_name
+        numeric total "numeric(14,2)"
+        int tax_group_version_no
+    }
+    job_errors {
+        uuid job_id PK, FK
+        int line PK "line number in the file"
+        varchar_1000 error
+    }
+    outbox_messages {
+        uuid id PK
+        text aggregate_type "batch-chunk"
+        text aggregate_id "jobId:chunkNo, the Kafka key"
+        text event_type "BatchChunkRequested"
+        int event_version
+        jsonb payload "the raw lines of the chunk"
+        text correlation_id "nullable"
+        timestamptz occurred_at
+        timestamptz published_at "nullable"
+    }
+```
+
+| Table | Purpose and notable constraints |
+|---|---|
+| `jobs` | One row per upload. `status` is stored as text. `total_rows` is counted at upload; `processed_rows` and `failed_rows` grow as results arrive, so they add up to `total_rows` when the job is Completed. The row is locked (`SELECT ... FOR UPDATE`) by the dispatcher, the results consumer and the cancel request, which is what keeps them from interleaving. Foreign keys from the other tables are `ON DELETE RESTRICT`; nothing deletes jobs yet. The list is read with the index on `created_at`. |
+| `job_files` | The uploaded CSV as `bytea`, in its own table so that listing jobs never touches the file. It is written in the same transaction as the job and read by the dispatcher (to split the job and to cut the lines of each chunk). It is kept after the job ends. |
+| `chunks` | The pieces of a job (500 data rows each by default), created all at once when the job starts. `first_line` and `row_count` say which lines belong to the chunk; blank lines are not counted in `row_count` but are counted in line numbers. `status`: Pending (not sent), Dispatched (its outbox row was written in the same transaction as this status) and Completed (its result arrived). The update to Completed is conditional on Dispatched, which makes a repeated result harmless. The window of 20 is the number of Dispatched chunks of a job. |
+| `job_results` | The cheapest plan for each valid row, with the plan version and tax group version that were used. Primary key `(job_id, line)`, so a line cannot be stored twice. Written in the same transaction that completes the chunk. |
+| `job_errors` | The reason each invalid row was rejected, with the same key. Invalid rows never stop a chunk or the job. |
+| `outbox_messages` | The same structure and filtered index as in the other services, for `BatchChunkRequested`. `aggregate_id` is `{jobId}:{chunkNo}` and becomes the Kafka key. A chunk is marked Dispatched and gets its outbox row in one transaction. Published rows older than 7 days are deleted by an hourly job. |
