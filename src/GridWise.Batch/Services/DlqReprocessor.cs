@@ -70,6 +70,7 @@ public static class DlqReprocessor
                             logger.LogWarning(ex, "DLQ message {Partition}@{Offset} failed again.",
                                 message.Partition.Value, message.Offset.Value);
                             await producer.ProduceAsync(Topics.BatchDlq, Requeue(message, ex), ct);
+                            GridWiseMetrics.DeadLettered(SourceTopic(message) ?? message.Topic); // a new message in the DLQ
                             failedAgain++;
                         }
 

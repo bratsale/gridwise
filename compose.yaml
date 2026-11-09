@@ -30,6 +30,7 @@ services:
       OTEL_SERVICE_NAME: catalog
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: 15000
     ports:
       - "${CATALOG_PORT:-5101}:8080"
     healthcheck:
@@ -73,6 +74,7 @@ services:
       OTEL_SERVICE_NAME: recommendation
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: 15000
     ports:
       - "${RECOMMENDATION_PORT:-5102}:8080"
     healthcheck:
@@ -101,6 +103,7 @@ services:
       OTEL_SERVICE_NAME: recommendation-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: 15000
     deploy:
       replicas: 2
     depends_on:
@@ -138,6 +141,7 @@ services:
       OTEL_SERVICE_NAME: batch
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: 15000
     ports:
       - "${BATCH_PORT:-5103}:8080"
     healthcheck:
@@ -180,6 +184,10 @@ services:
       - "${GRAFANA_PORT:-3000}:3000"
     volumes:
       - otel-lgtm-data:/data
+      # The GridWise dashboard and alert rules, provisioned from the repository (observability/grafana) when Grafana starts.
+      - ./observability/grafana/provisioning/dashboards/gridwise.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/gridwise.yaml:ro
+      - ./observability/grafana/provisioning/alerting/gridwise.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/gridwise.yaml:ro
+      - ./observability/grafana/dashboards:/otel-lgtm/gridwise-dashboards:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health > /dev/null && curl -fsS http://localhost:3200/ready > /dev/null"]
       interval: 5s

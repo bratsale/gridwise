@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using GridWise.Recommendation.Events;
+using GridWise.Recommendation.Telemetry;
 
 namespace GridWise.Recommendation.Services;
 
@@ -45,10 +46,19 @@ public class BatchWorker(
 
         consumer.Subscribe(Topics.BatchChunks);
 
+        GridWiseMetrics.InitializeDeadLetters(Topics.BatchChunks);
+        var lagDue = 0L;
+
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                if (Environment.TickCount64 >= lagDue)
+                {
+                    RecordLag(consumer, GroupId);
+                    lagDue = Environment.TickCount64 + LagIntervalMs;
+                }
+
                 ConsumeResult<string, string>? message;
                 try
                 {
@@ -81,6 +91,21 @@ public class BatchWorker(
         {
             consumer.Close();
             producer.Flush(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private const int LagIntervalMs = 5_000;
+
+    // Metrics must never stop the consumer: a failure here is logged and the next attempt is in 5 s.
+    private void RecordLag(IConsumer<string, string> consumer, string group)
+    {
+        try
+        {
+            GridWiseMetrics.RecordConsumerLag(group, consumer);
+        }
+        catch (KafkaException ex)
+        {
+            logger.LogDebug(ex, "Consumer lag could not be read.");
         }
     }
 }

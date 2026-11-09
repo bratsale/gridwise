@@ -22,6 +22,8 @@ public static class TelemetryExtensions
         {
             if (string.IsNullOrEmpty(builder.Configuration["OTEL_SERVICE_NAME"]))
                 resource.AddService(defaultServiceName);
+            // Tells replicas apart (the two workers have the same service name); in a container this is the container id.
+            resource.AddAttributes([new("service.instance.id", Environment.MachineName)]);
         });
 
         // "Npgsql" is the source of the database spans (EF Core runs its SQL through Npgsql).
@@ -33,6 +35,7 @@ public static class TelemetryExtensions
                 options.Filter = context => !context.Request.Path.StartsWithSegments("/health")));
 
         otel.WithMetrics(metrics => metrics
+            .AddMeter(GridWiseMetrics.MeterName)
             .AddAspNetCoreInstrumentation()
             .AddRuntimeInstrumentation());
 

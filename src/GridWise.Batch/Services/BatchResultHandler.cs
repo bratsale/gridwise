@@ -1,6 +1,7 @@
 using GridWise.Batch.Data;
 using GridWise.Batch.Domain;
 using GridWise.Batch.Events;
+using GridWise.Batch.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -77,6 +78,7 @@ public class BatchResultHandler(BatchDbContext db, TimeProvider time)
 
             await db.SaveChangesAsync(ct); // the job row: counters and, for the last chunk, the status
             await transaction.CommitAsync(ct);
+            GridWiseMetrics.BatchRowsStored(e.Results.Count, e.Errors.Count);
             return ResultOutcome.Applied;
         });
     }

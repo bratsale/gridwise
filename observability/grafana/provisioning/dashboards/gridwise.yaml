@@ -1,0 +1,10 @@
+# Loads the GridWise dashboards from the repository (mounted into the otel-lgtm container by compose.yaml).
+apiVersion: 1
+
+providers:
+  - name: GridWise
+    folder: GridWise
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/gridwise-dashboards

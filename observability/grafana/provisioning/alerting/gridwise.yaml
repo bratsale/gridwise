@@ -1,0 +1,66 @@
+# GridWise alert rules, provisioned from the repository when Grafana starts. There is no contact point: firing alerts are
+# shown in Grafana (Alerting -> Alert rules). Thresholds and what to do: docs/operations.md.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: gridwise
+    folder: GridWise
+    interval: 30s
+    rules:
+      - uid: gridwise-outbox-stuck
+        title: Outbox stuck
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max by (service_name) (gridwise_outbox_oldest_age_seconds)
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [60] }
+        for: 2m
+        # A service that is down sends no metrics; that is for the health checks, not for this rule.
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Events are not leaving {{ $labels.service_name }}"
+          description: "The oldest unpublished outbox row of {{ $labels.service_name }} is {{ humanizeDuration $values.A.Value }} old (threshold 60 s for 2 minutes). Usually Kafka is down or unreachable. See docs/operations.md."
+
+      - uid: gridwise-dead-letters
+        title: Dead letters
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (source_topic) (increase(gridwise_dlq_messages_total[5m]))
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "A message from {{ $labels.source_topic }} went to a dead-letter topic"
+          description: "Messages from {{ $labels.source_topic }} were dead-lettered in the last 5 minutes; each one needs a human. See docs/operations.md."

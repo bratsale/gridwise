@@ -73,7 +73,18 @@ flowchart TB
     batch -->|"chunks to process"| kafka
     kafka -->|"chunks to process"| worker
     kafka -->|"batch results"| batch
+
+    operator["<b>Operator</b><br/>developer or on-call"]
+    lgtm["<b>otel-lgtm</b><br/>Grafana (host 3000) with Tempo, Loki, Prometheus<br/>receives OTLP/HTTP: traces, metrics, logs<br/>dashboard and alert rules"]
+    catalog -.-> lgtm
+    rec -.-> lgtm
+    batch -.-> lgtm
+    worker -.-> lgtm
+    operator -->|"HTTP: dashboard, alerts,<br/>traces, logs"| lgtm
 ```
+
+`otel-lgtm` receives the traces, metrics and logs of the four .NET containers (dashed lines). Nothing depends on it: the services
+keep working when it is stopped. Its dashboard and alert rules come from `observability/grafana`; see [operations](../operations.md).
 
 ## Background services and topics
 

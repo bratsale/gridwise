@@ -100,6 +100,7 @@ public static class MessageProcessing
             try
             {
                 await producer.ProduceAsync(Topics.BatchDlq, dead, ct);
+                GridWiseMetrics.DeadLettered(message.Topic);
                 return;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

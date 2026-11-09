@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using GridWise.Recommendation.Data;
 using GridWise.Recommendation.Events;
+using GridWise.Recommendation.Telemetry;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
@@ -54,10 +55,19 @@ public class CatalogConsumer(
 
         consumer.Subscribe([Topics.CatalogPlanEvents, Topics.CatalogTaxGroupEvents]);
 
+        GridWiseMetrics.InitializeDeadLetters(Topics.CatalogPlanEvents, Topics.CatalogTaxGroupEvents);
+        var lagDue = 0L;
+
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                if (Environment.TickCount64 >= lagDue)
+                {
+                    RecordLag(consumer, config["Kafka:GroupId"]!);
+                    lagDue = Environment.TickCount64 + LagIntervalMs;
+                }
+
                 ConsumeResult<string, string>? message;
                 try
                 {
@@ -96,4 +106,19 @@ public class CatalogConsumer(
             logger.LogDebug("Message {Topic}[{Partition}]@{Offset}: {Outcome}",
                 message.Topic, message.Partition.Value, message.Offset.Value, outcome);
         }, time, logger, ct);
+
+    private const int LagIntervalMs = 5_000;
+
+    // Metrics must never stop the consumer: a failure here is logged and the next attempt is in 5 s.
+    private void RecordLag(IConsumer<string, string> consumer, string group)
+    {
+        try
+        {
+            GridWiseMetrics.RecordConsumerLag(group, consumer);
+        }
+        catch (KafkaException ex)
+        {
+            logger.LogDebug(ex, "Consumer lag could not be read.");
+        }
+    }
 }
