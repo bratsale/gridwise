@@ -36,13 +36,13 @@ export function PlanList({
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(plan)}>{plan.name}</button>
                 </td>
-                <td>{String(plan.versionNo)}</td>
+                <td className="mono">{String(plan.versionNo)}</td>
                 <td>
                   {isPending
                     ? <span className="badge pending">{t('common.saving')}</span>
                     : <span className={`badge ${retired ? 'retired' : 'active'}`}>{retired ? t('plans.status.retired') : t('plans.status.active')}</span>}
                 </td>
-                <td>{format.date(plan.effectiveFrom)}</td>
+                <td className="mono">{format.date(plan.effectiveFrom)}</td>
                 <td className="num">{format.percent(plan.discount)}</td>
                 <td className="num">{plan.tiers.length}</td>
                 <td>

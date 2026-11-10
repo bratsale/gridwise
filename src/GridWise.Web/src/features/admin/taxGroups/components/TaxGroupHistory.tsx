@@ -36,13 +36,13 @@ export function TaxGroupHistory({ taxGroup, versions }: { taxGroup: TaxGroup; ve
               <tbody>
                 {versions.map((v) => (
                   <tr key={String(v.versionNo)}>
-                    <td>{String(v.versionNo)}</td>
+                    <td className="mono">{String(v.versionNo)}</td>
                     <td>
                       <span className={`badge ${v.status === 'Retired' ? 'retired' : 'active'}`}>
                         {v.status === 'Retired' ? t('plans.status.retired') : t('plans.status.active')}
                       </span>
                     </td>
-                    <td>{format.date(v.effectiveFrom)}</td>
+                    <td className="mono">{format.date(v.effectiveFrom)}</td>
                     <td className="num">{format.percent(v.vat)}</td>
                     <td className="num">{format.price(v.ecoTax)}</td>
                   </tr>

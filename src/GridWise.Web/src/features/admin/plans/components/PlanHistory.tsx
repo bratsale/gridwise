@@ -36,13 +36,13 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
               <tbody>
                 {versions.map((v) => (
                   <tr key={String(v.versionNo)}>
-                    <td>{String(v.versionNo)}</td>
+                    <td className="mono">{String(v.versionNo)}</td>
                     <td>
                       <span className={`badge ${v.status === 'Retired' ? 'retired' : 'active'}`}>
                         {v.status === 'Retired' ? t('plans.status.retired') : t('plans.status.active')}
                       </span>
                     </td>
-                    <td>{format.date(v.effectiveFrom)}</td>
+                    <td className="mono">{format.date(v.effectiveFrom)}</td>
                     <td className="num">{format.percent(v.discount)}</td>
                     <td>
                       {v.tiers.length === 0

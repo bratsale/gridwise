@@ -37,13 +37,13 @@ export function TaxGroupList({
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(group)}>{group.code}</button>
                 </td>
-                <td>{String(group.versionNo)}</td>
+                <td className="mono">{String(group.versionNo)}</td>
                 <td>
                   {isPending
                     ? <span className="badge pending">{t('common.saving')}</span>
                     : <span className={`badge ${retired ? 'retired' : 'active'}`}>{retired ? t('plans.status.retired') : t('plans.status.active')}</span>}
                 </td>
-                <td>{format.date(group.effectiveFrom)}</td>
+                <td className="mono">{format.date(group.effectiveFrom)}</td>
                 <td className="num">{format.percent(group.vat)}</td>
                 <td className="num">{format.price(group.ecoTax)}</td>
                 <td>

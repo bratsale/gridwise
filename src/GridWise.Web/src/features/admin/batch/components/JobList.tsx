@@ -31,8 +31,8 @@ export function JobList({
                 <ProgressBar value={job.completedChunks} max={job.totalChunks} label={t('batch.col.progress')} />
                 <span className="hint">{t('batch.chunks', { done: job.completedChunks, total: job.totalChunks })}</span>
               </td>
-              <td>{t('batch.rows', { processed: format.integer(job.processedRows), failed: format.integer(job.failedRows) })}</td>
-              <td>{format.dateTime(job.createdAt)}</td>
+              <td className="mono">{t('batch.rows', { processed: format.integer(job.processedRows), failed: format.integer(job.failedRows) })}</td>
+              <td className="mono">{format.dateTime(job.createdAt)}</td>
             </tr>
           ))}
         </tbody>

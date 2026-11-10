@@ -61,7 +61,7 @@ export function RecommendationResult({
                     </button>
                     {isBest && <span className="badge best">{t('customer.best')}</span>}
                   </td>
-                  <td>{String(quote.planVersionNo)}</td>
+                  <td className="mono">{String(quote.planVersionNo)}</td>
                   <td className="num">{format.money(quote.total)}</td>
                   <td>
                     <button
