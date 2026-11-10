@@ -25,7 +25,7 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public async Task<TaxGroupResult> CreateAsync(
-        CreateTaxGroupRequest req, string correlationId, CancellationToken ct)
+        CreateTaxGroupRequest req, string correlationId, string? changedBy, CancellationToken ct)
     {
         if (await db.TaxGroups.AnyAsync(g => g.Code == req.Code, ct))
             return new TaxGroupResult.Conflict(AlreadyExists);
@@ -40,13 +40,13 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
 
         db.TaxGroups.Add(new TaxGroup { Code = req.Code, CreatedAt = now });
         var response = AddVersion(
-            req.Code, 1, req.Vat, req.EcoTax, VersionStatus.Active, effectiveFrom, correlationId, now);
+            req.Code, 1, req.Vat, req.EcoTax, VersionStatus.Active, effectiveFrom, correlationId, changedBy, now);
 
         return await SaveAsync(response, "tax_groups", AlreadyExists, ct);
     }
 
     public async Task<TaxGroupResult> AddVersionAsync(
-        string code, int expectedVersion, TaxGroupVersionRequest req, string correlationId, CancellationToken ct)
+        string code, int expectedVersion, TaxGroupVersionRequest req, string correlationId, string? changedBy, CancellationToken ct)
     {
         var (latest, failure) = await LoadLatestAsync(code, expectedVersion, ct);
         if (failure is not null)
@@ -61,13 +61,13 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
             return new TaxGroupResult.ValidationFailed(errors);
 
         var response = AddVersion(
-            code, latest.VersionNo + 1, req.Vat, req.EcoTax, VersionStatus.Active, effectiveFrom, correlationId, now);
+            code, latest.VersionNo + 1, req.Vat, req.EcoTax, VersionStatus.Active, effectiveFrom, correlationId, changedBy, now);
 
         return await SaveAsync(response, "tax_group_versions", VersionMismatch, ct);
     }
 
     public async Task<TaxGroupResult> RetireAsync(
-        string code, int expectedVersion, DateOnly? effectiveFrom, string correlationId, CancellationToken ct)
+        string code, int expectedVersion, DateOnly? effectiveFrom, string correlationId, string? changedBy, CancellationToken ct)
     {
         var (latest, failure) = await LoadLatestAsync(code, expectedVersion, ct);
         if (failure is not null)
@@ -82,7 +82,7 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
             return new TaxGroupResult.ValidationFailed(errors);
 
         var response = AddVersion(
-            code, latest.VersionNo + 1, latest.Vat, latest.EcoTax, VersionStatus.Retired, retiredFrom, correlationId, now);
+            code, latest.VersionNo + 1, latest.Vat, latest.EcoTax, VersionStatus.Retired, retiredFrom, correlationId, changedBy, now);
 
         return await SaveAsync(response, "tax_group_versions", VersionMismatch, ct);
     }
@@ -128,7 +128,7 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
 
     private TaxGroupResponse AddVersion(
         string code, int versionNo, decimal vat, decimal ecoTax, VersionStatus status,
-        DateOnly effectiveFrom, string correlationId, DateTimeOffset now)
+        DateOnly effectiveFrom, string correlationId, string? changedBy, DateTimeOffset now)
     {
         var response = new TaxGroupResponse(code, versionNo, vat, ecoTax, status.ToString(), effectiveFrom);
 
@@ -140,7 +140,8 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
             EcoTax = ecoTax,
             Status = status,
             EffectiveFrom = effectiveFrom,
-            CreatedAt = now
+            CreatedAt = now,
+            ChangedBy = changedBy
         });
 
         db.OutboxMessages.Add(new OutboxMessage
@@ -151,7 +152,7 @@ public class TaxGroupService(CatalogDbContext db, TimeProvider time)
             EventType = EventTypes.TaxGroupVersionCreated,
             EventVersion = 1,
             Payload = JsonSerializer.Serialize(
-                new TaxGroupVersionCreatedV1(code, versionNo, vat, ecoTax, status.ToString(), effectiveFrom),
+                new TaxGroupVersionCreatedV1(code, versionNo, vat, ecoTax, status.ToString(), effectiveFrom, changedBy),
                 Json),
             CorrelationId = correlationId,
             TraceParent = Tracing.CurrentTraceParent(),

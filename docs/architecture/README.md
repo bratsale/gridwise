@@ -193,7 +193,10 @@ Server-sent events are streamed without buffering; uploads up to 11 MB pass (bat
 here, and a request without `X-Correlation-Id` gets one, which is forwarded. It owns no data.
 
 It checks the bearer token of every `/api` request (Keycloak, audience `gridwise-api`) and forwards it unchanged; roles are the services'
-job. It also limits the rate per user (the token's `sub`; the client IP without a valid token), with fixed windows from configuration:
+job: each service checks the token again with the same settings (defense in depth) and decides by the realm roles. Catalog: reading for
+any user, changes for `admin` (versions store `changed_by`). Recommendation: `customer` or `admin`; a customer reads and accepts only
+their own recommendations (someone else's is 404, so its existence is not revealed), an admin reads any. Batch: `admin` only.
+nginx sets `X-Forwarded-For` to the client's address; the gateway believes it only from nginx's fixed address on the `edge` network. It also limits the rate per user (the token's `sub`; the client IP without a valid token), with fixed windows from configuration:
 
 | Policy | Requests | Limit |
 |---|---|---|

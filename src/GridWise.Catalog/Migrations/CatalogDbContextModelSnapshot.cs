@@ -177,6 +177,11 @@ namespace GridWise.Catalog.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("version_no");
 
+                    b.Property<string>("ChangedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("changed_by");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -238,6 +243,11 @@ namespace GridWise.Catalog.Migrations
                     b.Property<int>("VersionNo")
                         .HasColumnType("integer")
                         .HasColumnName("version_no");
+
+                    b.Property<string>("ChangedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("changed_by");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")

@@ -1,4 +1,5 @@
 using System.Globalization;
+using GridWise.Recommendation.Security;
 using GridWise.Recommendation.Services;
 using Microsoft.AspNetCore.Mvc;
 using static GridWise.Recommendation.Api.EndpointHelpers;
@@ -43,7 +44,7 @@ public static class RecommendationEndpoints
     {
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.CalculateAsync(request, correlationId, ct);
+        var result = await service.CalculateAsync(request, correlationId, http.User.UserId(), ct);
 
         switch (result)
         {
@@ -75,7 +76,7 @@ public static class RecommendationEndpoints
     {
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.AcceptAsync(id, request, correlationId, ct);
+        var result = await service.AcceptAsync(id, request, correlationId, http.User.UserId(), ct);
         http.Response.Headers["X-Correlation-Id"] = correlationId;
 
         return result switch
@@ -90,9 +91,9 @@ public static class RecommendationEndpoints
         };
     }
 
-    private static async Task<IResult> GetRecommendation(Guid id, RecommendationService service, CancellationToken ct)
+    private static async Task<IResult> GetRecommendation(Guid id, RecommendationService service, HttpContext http, CancellationToken ct)
     {
-        var recommendation = await service.GetAsync(id, ct);
+        var recommendation = await service.GetAsync(id, http.User.UserId(), http.User.IsInRole(ServiceAuthentication.AdminRole), ct);
 
         return recommendation is null
             ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Recommendation not found.")

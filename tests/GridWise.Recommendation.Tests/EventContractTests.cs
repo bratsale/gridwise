@@ -11,6 +11,21 @@ public class EventContractTests
     public void PlanVersionCreated_v1_golden_file_deserializes()
         => AssertPlan(JsonSerializer.Deserialize<PlanVersionCreatedV1>(Golden("PlanVersionCreated.v1.json"), Web)!);
 
+    // The consumer's copy of the contract has no changedBy (it does not need it). Both the current payload (with changedBy) and the
+    // payload from before the field existed must still be read.
+    [Fact]
+    public void PlanVersionCreated_v1_without_changedBy_golden_file_deserializes()
+        => AssertPlan(JsonSerializer.Deserialize<PlanVersionCreatedV1>(Golden("PlanVersionCreated.v1.without-changedBy.json"), Web)!);
+
+    [Fact]
+    public void TaxGroupVersionCreated_v1_without_changedBy_golden_file_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<TaxGroupVersionCreatedV1>(Golden("TaxGroupVersionCreated.v1.without-changedBy.json"), Web)!;
+
+        Assert.Equal("household", e.Code);
+        Assert.Equal(0.17m, e.Vat);
+    }
+
     [Fact]
     public void TaxGroupVersionCreated_v1_golden_file_deserializes()
     {

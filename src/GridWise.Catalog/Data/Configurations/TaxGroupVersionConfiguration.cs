@@ -20,6 +20,7 @@ public class TaxGroupVersionConfiguration : IEntityTypeConfiguration<TaxGroupVer
         builder.Property(v => v.Vat).HasPrecision(5, 4);
         builder.Property(v => v.EcoTax).HasPrecision(12, 4);
         builder.Property(v => v.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(v => v.ChangedBy).HasMaxLength(64);
 
         builder.HasOne<TaxGroup>()
             .WithMany(g => g.Versions)

@@ -8,4 +8,6 @@ public class PlanRecommendation
     public int TaxGroupVersionNo { get; set; }
     public DateTimeOffset CalculatedAt { get; set; }
     public string Items { get; set; } = null!;
+    /// <summary>The sub of the user who calculated it; a customer may read and accept only their own.</summary>
+    public string? CreatedBy { get; set; }
 }

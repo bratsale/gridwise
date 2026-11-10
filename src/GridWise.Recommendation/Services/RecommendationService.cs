@@ -42,7 +42,7 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public async Task<CalculateResult> CalculateAsync(
-        CreateRecommendationRequest req, string correlationId, CancellationToken ct)
+        CreateRecommendationRequest req, string correlationId, string? createdBy, CancellationToken ct)
     {
         if (decimal.Round(req.ConsumptionKwh, 3) != req.ConsumptionKwh)
             return new CalculateResult.ValidationFailed(new() { ["consumptionKwh"] = ["At most 3 decimal places."] });
@@ -107,7 +107,8 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
                 TaxGroupCode = taxGroup.Code,
                 TaxGroupVersionNo = taxGroup.VersionNo,
                 CalculatedAt = now,
-                Items = itemsJson
+                Items = itemsJson,
+                CreatedBy = createdBy
             });
 
             db.OutboxMessages.Add(new OutboxMessage
@@ -131,11 +132,13 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
         return new CalculateResult.Created(response, new CalculationTimings(dbRead, calc, json, save));
     }
 
+    // Only the user who calculated a recommendation may accept it (an admin too: accepting is the customer's decision, so an
+    // admin accepts only their own). Someone else's recommendation is "not found", so its existence is not revealed.
     public async Task<AcceptResult> AcceptAsync(
-        Guid id, AcceptPlanRequest req, string correlationId, CancellationToken ct)
+        Guid id, AcceptPlanRequest req, string correlationId, string? userId, CancellationToken ct)
     {
         var row = await db.PlanRecommendations.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
-        if (row is null)
+        if (row is null || row.CreatedBy != userId)
             return new AcceptResult.NotFound();
 
         var items = JsonSerializer.Deserialize<List<StoredQuote>>(row.Items, Json)!;
@@ -194,10 +197,12 @@ public class RecommendationService(RecommendationDbContext db, PlanRanker ranker
             ? new AcceptResult.AlreadyAccepted(ToResponse(existing, items))
             : new AcceptResult.Conflict();
 
-    public async Task<RecommendationResponse?> GetAsync(Guid id, CancellationToken ct)
+    // A customer reads only their own recommendations (someone else's is "not found", not "forbidden", so its existence is not
+    // revealed); an admin reads any.
+    public async Task<RecommendationResponse?> GetAsync(Guid id, string? userId, bool isAdmin, CancellationToken ct)
     {
         var row = await db.PlanRecommendations.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
-        if (row is null)
+        if (row is null || (!isAdmin && row.CreatedBy != userId))
             return null;
 
         var taxGroup = await db.TaxGroupVersions.AsNoTracking()

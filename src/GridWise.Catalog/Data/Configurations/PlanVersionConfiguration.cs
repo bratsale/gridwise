@@ -16,6 +16,7 @@ public class PlanVersionConfiguration : IEntityTypeConfiguration<PlanVersion>
         builder.Property(v => v.Name).HasMaxLength(100).IsRequired();
         builder.Property(v => v.Discount).HasPrecision(5, 4);
         builder.Property(v => v.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(v => v.ChangedBy).HasMaxLength(64);
 
         builder.HasOne<Plan>()
             .WithMany(p => p.Versions)

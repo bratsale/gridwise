@@ -10,10 +10,12 @@ public class EventContractTests
     private static readonly PlanVersionCreatedV1 Plan = new(
         Guid.Parse("5eed0000-0000-0000-0000-000000000001"), 1, "Standard", 0.05m, "Active",
         new DateOnly(2026, 1, 1),
-        [new(100m, 0.10m), new(300m, 0.08m), new(500m, 0.07m), new(null, 0.06m)]);
+        [new(100m, 0.10m), new(300m, 0.08m), new(500m, 0.07m), new(null, 0.06m)],
+        ChangedBy: "6f1c2a9e-0b7d-4c3e-9a51-3d2f8e7b4c10");
 
     private static readonly TaxGroupVersionCreatedV1 TaxGroup = new(
-        "household", 1, 0.17m, 0.005m, "Active", new DateOnly(2026, 1, 1));
+        "household", 1, 0.17m, 0.005m, "Active", new DateOnly(2026, 1, 1),
+        ChangedBy: "6f1c2a9e-0b7d-4c3e-9a51-3d2f8e7b4c10");
 
     [Fact]
     public void PlanVersionCreated_v1_serializes_to_golden_file()
@@ -40,6 +42,27 @@ public class EventContractTests
             Assert.Equal(Plan.Tiers[i].Threshold, e.Tiers[i].Threshold);
             Assert.Equal(Plan.Tiers[i].PricePerKwh, e.Tiers[i].PricePerKwh);
         }
+        Assert.Equal(Plan.ChangedBy, e.ChangedBy);
+    }
+
+    // changedBy was added to v1 later as an optional field: events written before it (and the seed events) have no value.
+    [Fact]
+    public void PlanVersionCreated_v1_without_changedBy_still_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<PlanVersionCreatedV1>(Golden("PlanVersionCreated.v1.without-changedBy.json"), Web)!;
+
+        Assert.Equal(Plan.Id, e.Id);
+        Assert.Equal(Plan.Tiers.Count, e.Tiers.Count);
+        Assert.Null(e.ChangedBy);
+    }
+
+    [Fact]
+    public void TaxGroupVersionCreated_v1_without_changedBy_still_deserializes()
+    {
+        var e = JsonSerializer.Deserialize<TaxGroupVersionCreatedV1>(Golden("TaxGroupVersionCreated.v1.without-changedBy.json"), Web)!;
+
+        Assert.Equal(TaxGroup.Code, e.Code);
+        Assert.Null(e.ChangedBy);
     }
 
     [Fact]
@@ -53,6 +76,7 @@ public class EventContractTests
         Assert.Equal(TaxGroup.EcoTax, e.EcoTax);
         Assert.Equal(TaxGroup.Status, e.Status);
         Assert.Equal(TaxGroup.EffectiveFrom, e.EffectiveFrom);
+        Assert.Equal(TaxGroup.ChangedBy, e.ChangedBy);
     }
 
     [Fact]
@@ -61,7 +85,7 @@ public class EventContractTests
         var envelope = new EventEnvelope(
             Guid.Parse("5eed0000-0000-0000-0001-000000000001"), EventTypes.PlanVersionCreated, 1,
             new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), "seed",
-            JsonSerializer.SerializeToElement(Plan, Web));
+            JsonSerializer.SerializeToElement(Plan with { ChangedBy = null }, Web)); // a seed event: nobody made it
 
         AssertSameJson("envelope.v1.json", JsonSerializer.Serialize(envelope, Web));
     }

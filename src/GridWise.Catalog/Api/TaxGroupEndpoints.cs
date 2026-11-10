@@ -1,3 +1,4 @@
+using GridWise.Catalog.Security;
 using GridWise.Catalog.Services;
 using Microsoft.AspNetCore.Mvc;
 using static GridWise.Catalog.Api.EndpointHelpers;
@@ -9,6 +10,7 @@ public static class TaxGroupEndpoints
     public static IEndpointRouteBuilder MapTaxGroupEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/tax-groups", CreateTaxGroup)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("CreateTaxGroup")
             .WithTags("Tax groups")
             .Produces<TaxGroupResponse>(StatusCodes.Status201Created)
@@ -16,6 +18,7 @@ public static class TaxGroupEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapPost("/tax-groups/{code}/versions", AddVersion)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("AddTaxGroupVersion")
             .WithTags("Tax groups")
             .Produces<TaxGroupResponse>(StatusCodes.Status201Created)
@@ -24,6 +27,7 @@ public static class TaxGroupEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapDelete("/tax-groups/{code}", RetireTaxGroup)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("RetireTaxGroup")
             .WithTags("Tax groups")
             .Produces(StatusCodes.Status204NoContent)
@@ -66,7 +70,7 @@ public static class TaxGroupEndpoints
     {
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.CreateAsync(request, correlationId, ct);
+        var result = await service.CreateAsync(request, correlationId, http.User.UserId(), ct);
 
         return ToResult(result, taxGroup =>
         {
@@ -89,7 +93,7 @@ public static class TaxGroupEndpoints
 
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.AddVersionAsync(code, expectedVersion, request, correlationId, ct);
+        var result = await service.AddVersionAsync(code, expectedVersion, request, correlationId, http.User.UserId(), ct);
 
         return ToResult(result, taxGroup =>
         {
@@ -112,7 +116,7 @@ public static class TaxGroupEndpoints
 
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.RetireAsync(code, expectedVersion, effectiveFrom, correlationId, ct);
+        var result = await service.RetireAsync(code, expectedVersion, effectiveFrom, correlationId, http.User.UserId(), ct);
 
         return ToResult(result, taxGroup =>
         {

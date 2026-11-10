@@ -10,5 +10,6 @@
     { "threshold": 300, "pricePerKwh": 0.08 },
     { "threshold": 500, "pricePerKwh": 0.07 },
     { "threshold": null, "pricePerKwh": 0.06 }
-  ]
+  ],
+  "changedBy": "6f1c2a9e-0b7d-4c3e-9a51-3d2f8e7b4c10"
 }

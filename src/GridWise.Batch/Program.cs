@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using GridWise.Batch.Api;
 using GridWise.Batch.Data;
+using GridWise.Batch.Security;
 using GridWise.Batch.Services;
 using GridWise.Batch.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ if (args.Contains("reprocess-dlq"))
     return await ReprocessDlqAsync(args);
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceAuthentication();
 builder.AddGridWiseTelemetry("batch");
 
 if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
@@ -51,14 +53,17 @@ for (var attempt = 1; ; attempt++)
 }
 
 app.UseCorrelationId();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapOpenApi();
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
-app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
+app.MapOpenApi().AllowAnonymous();
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription().AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription().AllowAnonymous();
 if (app.Environment.IsDevelopment())
-    app.MapScalarApiReference();
+    app.MapScalarApiReference().AllowAnonymous();
 
-app.MapJobEndpoints();
+// Every batch endpoint, the event stream and the downloads included: admins only.
+app.MapGroup("").RequireAuthorization(ServiceAuthentication.AdminPolicy).MapJobEndpoints();
 
 app.Run();
 return 0;

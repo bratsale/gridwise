@@ -1,5 +1,13 @@
 name: gridwise
 
+# Bearer token settings, the same for the gateway and the three services: keys from Keycloak's internal address (plain HTTP inside
+# the compose network), issuer = the public address of Keycloak, audience gridwise-api.
+x-jwt: &jwt
+  Jwt__MetadataAddress: http://keycloak:8080/auth/realms/gridwise/.well-known/openid-configuration
+  Jwt__RequireHttpsMetadata: "false"
+  Jwt__Issuer: ${KEYCLOAK_HOSTNAME:-http://localhost:${WEB_PORT:-5100}/auth}/realms/gridwise
+  Jwt__Audience: gridwise-api
+
 services:
   catalog-db:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
@@ -23,6 +31,7 @@ services:
       context: .
       dockerfile: src/GridWise.Catalog/Dockerfile
     environment:
+      <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw}
       Kafka__BootstrapServers: kafka:9092
@@ -67,6 +76,7 @@ services:
       context: .
       dockerfile: src/GridWise.Recommendation/Dockerfile
     environment:
+      <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
@@ -134,6 +144,7 @@ services:
       context: .
       dockerfile: src/GridWise.Batch/Dockerfile
     environment:
+      <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
       Kafka__BootstrapServers: kafka:9092
@@ -173,10 +184,9 @@ services:
       ReverseProxy__Clusters__catalog__Destinations__main__Address: http://catalog:8080/
       ReverseProxy__Clusters__recommendation__Destinations__main__Address: http://recommendation:8080/
       ReverseProxy__Clusters__batch__Destinations__main__Address: http://batch:8080/
-      # Bearer tokens: keys from Keycloak's internal address (plain HTTP inside the compose network), issuer = the public address.
-      Jwt__MetadataAddress: http://keycloak:8080/auth/realms/gridwise/.well-known/openid-configuration
-      Jwt__RequireHttpsMetadata: "false"
-      Jwt__Issuer: ${KEYCLOAK_HOSTNAME:-http://localhost:${WEB_PORT:-5100}/auth}/realms/gridwise
+      <<: *jwt
+      # nginx's fixed address on the edge network: the only sender whose X-Forwarded-For is believed.
+      ForwardedHeaders__KnownProxies__0: ${WEB_EDGE_IP:-172.30.0.10}
     # Published for debugging only; the browser goes through web (nginx).
     ports:
       - "${GATEWAY_PORT:-5104}:8080"
@@ -195,6 +205,9 @@ services:
         condition: service_healthy
       batch:
         condition: service_healthy
+    networks:
+      - default
+      - edge
 
   web:
     image: ${REGISTRY:-gridwise}/web:${TAG:-local}
@@ -210,6 +223,10 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+    # Only on the edge network, with a fixed address the gateway trusts for X-Forwarded-For.
+    networks:
+      edge:
+        ipv4_address: ${WEB_EDGE_IP:-172.30.0.10}
 
   # Identity provider (OpenID Connect), served by the web container's nginx at /auth so the browser and the token issuer use one
   # address: http://localhost:5100/auth/realms/gridwise. Dev mode with its embedded database (no extra PostgreSQL): the realm is
@@ -240,6 +257,9 @@ services:
       timeout: 3s
       retries: 40
       start_period: 30s
+    networks:
+      - default
+      - edge
 
   # Grafana, Tempo (traces), Loki (logs) and Prometheus/Mimir (metrics) in one container, with an OTLP receiver (4317 gRPC, 4318 HTTP).
   # The services send to it inside the network; only Grafana is published. It is the heaviest part of the system: about 0.6 GB of memory (measured when idle; it grows with the amount of data kept)
@@ -319,3 +339,11 @@ volumes:
   batch-db-data:
   kafka-data:
   otel-lgtm-data:
+
+networks:
+  default: {}
+  # Between nginx (web) and what it proxies to (gateway, keycloak). A fixed subnet, so nginx has a fixed address there.
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.0.0/24}

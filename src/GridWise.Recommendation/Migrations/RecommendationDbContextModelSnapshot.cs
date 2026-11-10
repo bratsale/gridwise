@@ -120,6 +120,11 @@ namespace GridWise.Recommendation.Migrations
                         .HasColumnType("numeric(12,3)")
                         .HasColumnName("consumption_kwh");
 
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("Items")
                         .IsRequired()
                         .HasColumnType("jsonb")

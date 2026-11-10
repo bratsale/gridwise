@@ -24,6 +24,7 @@ public class CatalogFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        TestAuth.Configure(builder);
         builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -40,5 +41,12 @@ public class CatalogFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(OutboxPublisher)));
             services.AddSingleton<TimeProvider>(new FakeTimeProvider(new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero)));
         });
+    }
+
+    // Every client of this factory sends a token, by default as admin "admin-1"; tests switch with .As(...) or .Anonymous().
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+        client.As(TestAuth.Admin, "admin-1");
     }
 }

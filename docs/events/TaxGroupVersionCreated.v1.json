@@ -4,5 +4,6 @@
   "vat": 0.17,
   "ecoTax": 0.005,
   "status": "Active",
-  "effectiveFrom": "2026-01-01"
+  "effectiveFrom": "2026-01-01",
+  "changedBy": "6f1c2a9e-0b7d-4c3e-9a51-3d2f8e7b4c10"
 }

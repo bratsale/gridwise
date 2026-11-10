@@ -24,6 +24,7 @@ public class RecommendationFactory : WebApplicationFactory<Program>, IAsyncLifet
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        TestAuth.Configure(builder);
         builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -41,5 +42,12 @@ public class RecommendationFactory : WebApplicationFactory<Program>, IAsyncLifet
                     d.ServiceType == typeof(IHostedService) && d.ImplementationType == hostedService));
             services.AddSingleton<TimeProvider>(new FakeTimeProvider(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero)));
         });
+    }
+
+    // Every client of this factory sends a token, by default as customer "customer-1"; tests switch with .As(...) or .Anonymous().
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+        client.As(TestAuth.Customer, "customer-1");
     }
 }

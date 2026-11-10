@@ -1,5 +1,6 @@
 using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
+using GridWise.Catalog.Security;
 using GridWise.Catalog.Services;
 using GridWise.Catalog.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ using Npgsql;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceAuthentication();
 builder.AddGridWiseTelemetry("catalog");
 
 if (string.IsNullOrEmpty(builder.Configuration["Kafka:BootstrapServers"]))
@@ -47,12 +49,14 @@ for (var attempt = 1; ; attempt++)
 }
 
 app.UseCorrelationId();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapOpenApi();
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
-app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
+app.MapOpenApi().AllowAnonymous();
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription().AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription().AllowAnonymous();
 if (app.Environment.IsDevelopment())
-    app.MapScalarApiReference();
+    app.MapScalarApiReference().AllowAnonymous();
 
 app.MapPlanEndpoints();
 app.MapTaxGroupEndpoints();

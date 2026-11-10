@@ -9,6 +9,7 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
     public void Configure(EntityTypeBuilder<Job> builder)
     {
         builder.ToTable("jobs");
+        builder.Property(j => j.CreatedBy).HasMaxLength(64);
         builder.HasKey(j => j.Id);
 
         builder.Property(j => j.Id).ValueGeneratedNever();

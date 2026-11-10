@@ -94,4 +94,24 @@ public class RateLimitingTests(GatewayFixture gateway)
 
         Assert.All(codes, code => Assert.Equal(HttpStatusCode.OK, code));
     }
+
+    [Fact]
+    public async Task Anonymous_requests_are_limited_per_client_address_from_the_trusted_proxy()
+    {
+        var client = gateway.CreateAnonymousClient();
+        Task<HttpResponseMessage> From(string address)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/catalog/plans");
+            request.Headers.Add("X-Forwarded-For", address);
+            return client.SendAsync(request);
+        }
+
+        var first100 = await Send(100, () => From("203.0.113.7"));
+        var limited = await From("203.0.113.7");
+        var otherClient = await From("203.0.113.8");
+
+        Assert.All(first100, code => Assert.Equal(HttpStatusCode.Unauthorized, code)); // no token, but counted
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, otherClient.StatusCode); // a different client has its own limit
+    }
 }

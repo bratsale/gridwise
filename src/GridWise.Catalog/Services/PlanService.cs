@@ -33,7 +33,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public async Task<CreatePlanResult> CreateAsync(
-        CreatePlanRequest req, string idempotencyKey, string correlationId, CancellationToken ct)
+        CreatePlanRequest req, string idempotencyKey, string correlationId, string? changedBy, CancellationToken ct)
     {
         var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(req))));
 
@@ -58,7 +58,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
 
         db.Plans.Add(new Plan { Id = planId, CreatedAt = now });
         var response = AddVersion(
-            planId, 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, now);
+            planId, 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, changedBy, now);
         var responseJson = JsonSerializer.Serialize(response, Json);
 
         db.IdempotencyKeys.Add(new IdempotencyKey
@@ -90,7 +90,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
     }
 
     public async Task<ChangePlanResult> AddVersionAsync(
-        Guid planId, int expectedVersion, CreatePlanRequest req, string correlationId, CancellationToken ct)
+        Guid planId, int expectedVersion, CreatePlanRequest req, string correlationId, string? changedBy, CancellationToken ct)
     {
         var (latest, failure) = await LoadLatestAsync(planId, expectedVersion, ct);
         if (failure is not null)
@@ -110,13 +110,13 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             return new ChangePlanResult.ValidationFailed(errors);
 
         var response = AddVersion(
-            planId, latest.VersionNo + 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, now);
+            planId, latest.VersionNo + 1, req.Name, req.Discount, VersionStatus.Active, effectiveFrom, tiers, correlationId, changedBy, now);
 
         return await SaveAsync(response, ct);
     }
 
     public async Task<ChangePlanResult> RetireAsync(
-        Guid planId, int expectedVersion, DateOnly? effectiveFrom, string correlationId, CancellationToken ct)
+        Guid planId, int expectedVersion, DateOnly? effectiveFrom, string correlationId, string? changedBy, CancellationToken ct)
     {
         var (latest, failure) = await LoadLatestAsync(planId, expectedVersion, ct);
         if (failure is not null)
@@ -131,14 +131,14 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             return new ChangePlanResult.ValidationFailed(errors);
 
         var response = AddVersion(
-            planId, latest.VersionNo + 1, latest.Name, latest.Discount, VersionStatus.Retired, retiredFrom, [], correlationId, now);
+            planId, latest.VersionNo + 1, latest.Name, latest.Discount, VersionStatus.Retired, retiredFrom, [], correlationId, changedBy, now);
 
         return await SaveAsync(response, ct);
     }
 
     private PlanResponse AddVersion(
         Guid planId, int versionNo, string name, decimal discount, VersionStatus status,
-        DateOnly effectiveFrom, List<TierRequest> tiers, string correlationId, DateTimeOffset now)
+        DateOnly effectiveFrom, List<TierRequest> tiers, string correlationId, string? changedBy, DateTimeOffset now)
     {
         var response = new PlanResponse(planId, versionNo, name, discount, status.ToString(), effectiveFrom, tiers);
 
@@ -151,6 +151,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             Status = status,
             EffectiveFrom = effectiveFrom,
             CreatedAt = now,
+            ChangedBy = changedBy,
             Tiers = tiers.Select((t, i) => new PlanTier
             {
                 PlanId = planId,
@@ -171,7 +172,7 @@ public class PlanService(CatalogDbContext db, TimeProvider time)
             Payload = JsonSerializer.Serialize(
                 new PlanVersionCreatedV1(
                     planId, versionNo, name, discount, status.ToString(), effectiveFrom,
-                    tiers.Select(t => new PlanTierV1(t.Threshold, t.PricePerKwh)).ToList()),
+                    tiers.Select(t => new PlanTierV1(t.Threshold, t.PricePerKwh)).ToList(), changedBy),
                 Json),
             CorrelationId = correlationId,
             TraceParent = Tracing.CurrentTraceParent(),

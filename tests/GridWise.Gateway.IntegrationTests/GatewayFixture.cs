@@ -61,6 +61,9 @@ public sealed class GatewayFixture : IAsyncLifetime
                 ["Jwt:RequireHttpsMetadata"] = "false",
                 // The real limits, except a shorter recommendations window, so "the next window" is 3 s away instead of 10.
                 ["RateLimiting:Recommendations:WindowSeconds"] = "3",
+                // The test client connects from loopback; in compose this is nginx's fixed address.
+                ["ForwardedHeaders:KnownProxies:0"] = "127.0.0.1",
+                ["ForwardedHeaders:KnownProxies:1"] = "::1",
                 // As verbose as it gets by default: the categories that would print a request line stay pinned in appsettings.json.
                 ["Logging:LogLevel:Default"] = "Trace"
             }));

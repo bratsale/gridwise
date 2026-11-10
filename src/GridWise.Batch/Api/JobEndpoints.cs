@@ -1,5 +1,6 @@
 using GridWise.Batch.Data;
 using GridWise.Batch.Domain;
+using GridWise.Batch.Security;
 using GridWise.Batch.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +69,7 @@ public static class JobEndpoints
         var job = new Job
         {
             Id = Guid.CreateVersion7(),
+            CreatedBy = http.User.UserId(),
             Status = JobStatus.Pending,
             FileName = Path.GetFileName(file.FileName) is { Length: > 0 } name ? name[..Math.Min(name.Length, 255)] : "upload.csv",
             TotalRows = totalRows,

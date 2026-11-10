@@ -26,6 +26,7 @@ public class BatchFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        TestAuth.Configure(builder);
         builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -42,5 +43,12 @@ public class BatchFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
         });
+    }
+
+    // Every client of this factory sends a token, by default as admin "admin-1"; tests switch with .As(...) or .Anonymous().
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+        client.As(TestAuth.Admin, "admin-1");
     }
 }

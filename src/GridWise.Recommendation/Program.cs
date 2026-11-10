@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using GridWise.Recommendation.Api;
 using GridWise.Recommendation.Data;
+using GridWise.Recommendation.Security;
 using GridWise.Recommendation.Services;
 using GridWise.Recommendation.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ if (args.Contains("worker"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceAuthentication();
 builder.AddGridWiseTelemetry("recommendation");
 
 foreach (var setting in new[] { "Kafka:BootstrapServers", "Kafka:GroupId" })
@@ -62,14 +64,17 @@ for (var attempt = 1; ; attempt++)
 }
 
 app.UseCorrelationId();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapOpenApi();
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription();
-app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
+app.MapOpenApi().AllowAnonymous();
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).ExcludeFromDescription().AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription().AllowAnonymous();
 if (app.Environment.IsDevelopment())
-    app.MapScalarApiReference();
+    app.MapScalarApiReference().AllowAnonymous();
 
-app.MapRecommendationEndpoints();
+// Calculate, read and accept: customers and admins (who may see which recommendation is decided in the service).
+app.MapGroup("").RequireAuthorization(ServiceAuthentication.CustomerOrAdminPolicy).MapRecommendationEndpoints();
 
 app.Run();
 return 0;

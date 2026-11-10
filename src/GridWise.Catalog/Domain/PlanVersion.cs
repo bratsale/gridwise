@@ -9,5 +9,7 @@ public class PlanVersion
     public VersionStatus Status { get; set; }
     public DateOnly EffectiveFrom { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>Who made this version: the sub of the user's token (null for the seed data and versions from before this column).</summary>
+    public string? ChangedBy { get; set; }
     public List<PlanTier> Tiers { get; set; } = [];
 }

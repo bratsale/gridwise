@@ -9,6 +9,7 @@ public class PlanRecommendationConfiguration : IEntityTypeConfiguration<PlanReco
     public void Configure(EntityTypeBuilder<PlanRecommendation> builder)
     {
         builder.ToTable("recommendations");
+        builder.Property(r => r.CreatedBy).HasMaxLength(64);
         builder.HasKey(r => r.Id);
 
         builder.Property(r => r.ConsumptionKwh).HasPrecision(12, 3);

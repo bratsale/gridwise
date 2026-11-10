@@ -70,6 +70,11 @@ namespace GridWise.Batch.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("created_by");
+
                     b.Property<int>("FailedRows")
                         .HasColumnType("integer")
                         .HasColumnName("failed_rows");

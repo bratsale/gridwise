@@ -37,6 +37,9 @@ Every Kafka message value is an envelope around the event data. The Kafka key is
 | tiers | array | Progressive tiers in order, empty for a retired version |
 | tiers[].threshold | decimal or null | Upper kWh bound of the tier, `null` = no limit (last tier) |
 | tiers[].pricePerKwh | decimal | Price per kWh inside this tier |
+| changedBy | string or null | Optional. The `sub` (user id) of the admin who made the version; `null` for seed data. Added later in v1 (see below) |
+
+Events written before `changedBy` existed have no such field: [PlanVersionCreated.v1.without-changedBy.json](PlanVersionCreated.v1.without-changedBy.json).
 
 ## TaxGroupVersionCreated (v1)
 
@@ -53,6 +56,28 @@ Every Kafka message value is an envelope around the event data. The Kafka key is
 | ecoTax | decimal | Eco tax per kWh |
 | status | string | `Active` or `Retired` |
 | effectiveFrom | date | First day (UTC) the version applies |
+| changedBy | string or null | Optional. The `sub` (user id) of the admin who made the version; `null` for seed data. Added later in v1 (see below) |
+
+Events written before `changedBy` existed have no such field: [TaxGroupVersionCreated.v1.without-changedBy.json](TaxGroupVersionCreated.v1.without-changedBy.json).
+
+## Who made a change: changedBy, and no tokens in events
+
+`changedBy` was added to `PlanVersionCreated` and `TaxGroupVersionCreated` as an optional field, a compatible change, so the version
+stays 1. Consumers must not require it: the topics keep every event forever, so events without it are read again on every replay.
+The Recommendation consumer's copy of the contract does not even have the field; the contract tests read both samples, with and
+without it. It is an audit field: catalog stores the same value in `plan_versions.changed_by` and `tax_group_versions.changed_by`.
+
+Events never carry the user's token, only the user id:
+
+- A token is valid for 5 minutes. An event is processed later (after an outage, from a dead-letter topic) or replayed months later
+  from the start of the topic; its token would long have expired and could not be checked any more.
+- Consumers do not decide per event whether the user was allowed to do it. That was decided once, by the producer, when the request
+  came in; an event is a fact that has already happened.
+- Who may read and write a topic is controlled at the broker (in production: authentication and ACLs per service on Kafka), not by
+  tokens inside the messages. A token in a message would only be a secret that every reader of the topic could reuse.
+
+`RecommendationCalculated`, `PlanAccepted` and the batch events carry no user identity: no consumer needs it. The services keep
+it in their own tables (`recommendations.created_by`, `jobs.created_by`).
 
 ## RecommendationCalculated (v1)
 

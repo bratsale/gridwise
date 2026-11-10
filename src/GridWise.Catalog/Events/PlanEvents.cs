@@ -9,4 +9,7 @@ public record PlanVersionCreatedV1(
     decimal Discount,
     string Status,
     DateOnly EffectiveFrom,
-    IReadOnlyList<PlanTierV1> Tiers);
+    IReadOnlyList<PlanTierV1> Tiers,
+    // Added later as an optional field (compatible, the version stays 1): the sub of the admin who made the version.
+    // Null for versions written before it existed; consumers must not require it.
+    string? ChangedBy = null);

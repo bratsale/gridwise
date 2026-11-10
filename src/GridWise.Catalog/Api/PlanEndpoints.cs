@@ -1,3 +1,4 @@
+using GridWise.Catalog.Security;
 using GridWise.Catalog.Services;
 using Microsoft.AspNetCore.Mvc;
 using static GridWise.Catalog.Api.EndpointHelpers;
@@ -9,6 +10,7 @@ public static class PlanEndpoints
     public static IEndpointRouteBuilder MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/plans", CreatePlan)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("CreatePlan")
             .WithTags("Plans")
             .Produces<PlanResponse>(StatusCodes.Status201Created)
@@ -16,6 +18,7 @@ public static class PlanEndpoints
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         app.MapPost("/plans/{id:guid}/versions", AddVersion)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("AddPlanVersion")
             .WithTags("Plans")
             .Produces<PlanResponse>(StatusCodes.Status201Created)
@@ -24,6 +27,7 @@ public static class PlanEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapDelete("/plans/{id:guid}", RetirePlan)
+            .RequireAuthorization(ServiceAuthentication.AdminPolicy)
             .WithName("RetirePlan")
             .WithTags("Plans")
             .Produces(StatusCodes.Status204NoContent)
@@ -73,7 +77,7 @@ public static class PlanEndpoints
 
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.CreateAsync(request, idempotencyKey, correlationId, ct);
+        var result = await service.CreateAsync(request, idempotencyKey, correlationId, http.User.UserId(), ct);
 
         switch (result)
         {
@@ -105,7 +109,7 @@ public static class PlanEndpoints
 
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.AddVersionAsync(id, expectedVersion, request, correlationId, ct);
+        var result = await service.AddVersionAsync(id, expectedVersion, request, correlationId, http.User.UserId(), ct);
 
         return ToResult(result, plan =>
         {
@@ -128,7 +132,7 @@ public static class PlanEndpoints
 
         correlationId = ResolveCorrelationId(correlationId);
 
-        var result = await service.RetireAsync(id, expectedVersion, effectiveFrom, correlationId, ct);
+        var result = await service.RetireAsync(id, expectedVersion, effectiveFrom, correlationId, http.User.UserId(), ct);
 
         return ToResult(result, plan =>
         {
