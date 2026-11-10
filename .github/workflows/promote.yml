@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
           missing=0
-          for service in catalog recommendation batch web; do
+          for service in catalog recommendation batch gateway web; do
             image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise/$service:$TAG"
             if docker manifest inspect "$image" > /dev/null 2>&1; then
               echo "found   $image"

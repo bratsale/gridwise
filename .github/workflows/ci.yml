@@ -63,6 +63,7 @@ jobs:
           - { service: catalog, context: ., file: src/GridWise.Catalog/Dockerfile }
           - { service: recommendation, context: ., file: src/GridWise.Recommendation/Dockerfile }
           - { service: batch, context: ., file: src/GridWise.Batch/Dockerfile }
+          - { service: gateway, context: ., file: src/GridWise.Gateway/Dockerfile }
           - { service: web, context: src/GridWise.Web, file: src/GridWise.Web/Dockerfile }
     steps:
       - uses: actions/checkout@v7

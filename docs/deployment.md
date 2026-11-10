@@ -22,7 +22,7 @@ flowchart LR
 
 ## Build once, deploy many
 
-The four images (`catalog`, `recommendation`, `batch`, `web`) are built once, tagged with the commit SHA and pushed to
+The five images (`catalog`, `recommendation`, `batch`, `gateway`, `web`) are built once, tagged with the commit SHA and pushed to
 `ghcr.io/<owner>/gridwise/<service>:<sha>`. The worker is the `recommendation` image started with the command `worker`.
 The e2e tests and all three environments run exactly these images. Nothing is rebuilt between environments.
 
@@ -69,7 +69,7 @@ rolling back means deploying an older one.
 
 1. Find the SHA: the commit of a successful `CI/CD` run on `main` (the full 40 characters; Actions → the run → the commit link).
 2. Actions → **Promote** → Run workflow. Choose `environment` (`qa` or `prod`) and paste the SHA into `tag`.
-3. The workflow checks that all four images for that SHA exist in ghcr.io (and fails with the missing names if not), pulls them,
+3. The workflow checks that all five images for that SHA exist in ghcr.io (and fails with the missing names if not), pulls them,
    starts the stack with `deploy/<environment>.env`, runs the smoke test and stops it (the deployment is simulated).
 
 Notes:

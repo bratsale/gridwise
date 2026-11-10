@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5104",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ReverseProxy__Clusters__catalog__Destinations__main__Address": "http://localhost:5101/",
+        "ReverseProxy__Clusters__recommendation__Destinations__main__Address": "http://localhost:5102/",
+        "ReverseProxy__Clusters__batch__Destinations__main__Address": "http://localhost:5103/"
+      }
+    }
+  }
+}

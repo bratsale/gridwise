@@ -58,9 +58,11 @@ flowchart TB
     kafka[["<b>Kafka</b><br/>one broker, 7 topics"]]
 
     browser -->|"HTTP: page and static files"| web
-    web -->|"HTTP/REST /api/catalog/*"| catalog
-    web -->|"HTTP/REST /api/recommendation/*"| rec
-    web -->|"HTTP/REST /api/batch/*<br/>and server-sent events (progress)"| batch
+    gateway["<b>gateway</b><br/>YARP reverse proxy (host 5104, debugging)<br/>/api/&lt;service&gt;/* to the service"]
+    web -->|"HTTP /api/*<br/>and server-sent events (progress)"| gateway
+    gateway -->|"HTTP/REST /api/catalog/*"| catalog
+    gateway -->|"HTTP/REST /api/recommendation/*"| rec
+    gateway -->|"HTTP/REST /api/batch/*<br/>and server-sent events (progress)"| batch
 
     catalog -->|"SQL"| catalogdb
     rec -->|"SQL"| recdb
@@ -76,6 +78,7 @@ flowchart TB
 
     operator["<b>Operator</b><br/>developer or on-call"]
     lgtm["<b>otel-lgtm</b><br/>Grafana (host 3000) with Tempo, Loki, Prometheus<br/>receives OTLP/HTTP: traces, metrics, logs<br/>dashboard and alert rules"]
+    gateway -.-> lgtm
     catalog -.-> lgtm
     rec -.-> lgtm
     batch -.-> lgtm
@@ -83,7 +86,7 @@ flowchart TB
     operator -->|"HTTP: dashboard, alerts,<br/>traces, logs"| lgtm
 ```
 
-`otel-lgtm` receives the traces, metrics and logs of the four .NET containers (dashed lines). Nothing depends on it: the services
+`otel-lgtm` receives the traces, metrics and logs of the five .NET containers (dashed lines). Nothing depends on it: the services
 keep working when it is stopped. Its dashboard and alert rules come from `observability/grafana`; see [operations](../operations.md).
 
 ## Background services and topics
@@ -131,9 +134,11 @@ flowchart TB
     end
 
     browser -->|"HTTP: page and static files"| web
-    web -->|"HTTP/REST /api/catalog/*<br/>manage plans and tax groups, list tax groups"| catalog
-    web -->|"HTTP/REST /api/recommendation/*<br/>calculate, accept, read"| rec
-    web -->|"HTTP/REST /api/batch/*<br/>upload CSV, list, cancel, download;<br/>server-sent events: live progress"| batch
+    gateway["<b>gateway</b><br/>YARP reverse proxy (host 5104, debugging)<br/>/api/&lt;service&gt;/* to the service"]
+    web -->|"HTTP /api/*"| gateway
+    gateway -->|"HTTP/REST /api/catalog/*<br/>manage plans and tax groups, list tax groups"| catalog
+    gateway -->|"HTTP/REST /api/recommendation/*<br/>calculate, accept, read"| rec
+    gateway -->|"HTTP/REST /api/batch/*<br/>upload CSV, list, cancel, download;<br/>server-sent events: live progress"| batch
 
     catalog -->|"SQL: plans, tax groups,<br/>idempotency keys, outbox"| catalogdb
     rec -->|"SQL: read model copy,<br/>recommendations, acceptances, outbox"| recdb
@@ -171,13 +176,21 @@ flowchart TB
 ### web
 
 Responsibility: serves the React single-page app and is the only address the browser needs. nginx
-(`nginxinc/nginx-unprivileged`, port 8080) serves the static files and forwards `/api/catalog/*`, `/api/recommendation/*` and
-`/api/batch/*` to the three services, removing the prefix. The progress stream of a batch job (`/api/batch/jobs/{id}/events`) has its own
-nginx location with buffering off and a one-hour read timeout. It owns no data. The app has a customer page (calculate, compare, accept) and an
+(`nginxinc/nginx-unprivileged`, port 8080) serves the static files, forwards everything under `/api/` unchanged to the gateway and
+`/auth/` to Keycloak. The progress stream of a batch job (`/api/batch/jobs/{id}/events`) has its own nginx location with buffering off
+and a one-hour read timeout. It owns no data. The app has a customer page (calculate, compare, accept) and an
 admin page (plans and tax groups: create, new version, retire, history; and batch: upload a CSV, watch the progress, cancel, download
 results). It reads the tax group list from the catalog, talks to batch for the batch page and does all other customer calls against
 the recommendation service. nginx is a plain reverse proxy: it does no authentication,
 rate limiting or token checks.
+
+### gateway
+
+Responsibility: the single entry to the APIs. A YARP reverse proxy (ASP.NET, port 8080, host 5104 for debugging) that forwards
+`/api/catalog/*`, `/api/recommendation/*` and `/api/batch/*` to the three services with the prefix removed: the same paths nginx used
+before. The routes are in `src/GridWise.Gateway/appsettings.json`, the service addresses in compose (environment variables).
+Server-sent events are streamed without buffering; uploads up to 11 MB pass (batch enforces its 10 MB limit). A request's trace starts
+here, and a request without `X-Correlation-Id` gets one, which is forwarded. It owns no data and, for now, checks no tokens.
 
 ### catalog and catalog-db
 

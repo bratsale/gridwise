@@ -31,7 +31,7 @@ runs:
       run: |
         export REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gridwise"
         echo "Deploying $REGISTRY/*:$TAG to $ENVIRONMENT"
-        docker compose --env-file "deploy/$ENVIRONMENT.env" pull --quiet catalog recommendation recommendation-worker batch web
+        docker compose --env-file "deploy/$ENVIRONMENT.env" pull --quiet catalog recommendation recommendation-worker batch gateway web
         docker compose --env-file "deploy/$ENVIRONMENT.env" up -d --no-build --wait --wait-timeout 300
 
     - name: Smoke test
