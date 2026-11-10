@@ -1,0 +1,122 @@
+{
+  "realm": "gridwise",
+  "displayName": "GridWise",
+  "enabled": true,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Manages plans, tax groups and batch jobs"
+      },
+      {
+        "name": "customer",
+        "description": "Calculates and accepts recommendations"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@gridwise.local",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin_dev_pw",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin",
+        "default-roles-gridwise"
+      ]
+    },
+    {
+      "username": "customer",
+      "enabled": true,
+      "email": "customer@gridwise.local",
+      "emailVerified": true,
+      "firstName": "Customer",
+      "lastName": "Dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer_dev_pw",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "customer",
+        "default-roles-gridwise"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "gridwise-web",
+      "name": "GridWise web app",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:5100",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:5100/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5100"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5100/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience gridwise-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "gridwise-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "gridwise-cli",
+      "name": "GridWise scripts and smoke tests (dev only)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "audience gridwise-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "gridwise-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

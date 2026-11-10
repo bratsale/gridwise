@@ -175,6 +175,33 @@ services:
       batch:
         condition: service_healthy
 
+  # Identity provider (OpenID Connect), served by the web container's nginx at /auth so the browser and the token issuer use one
+  # address: http://localhost:5100/auth/realms/gridwise. Dev mode with its embedded database (no extra PostgreSQL): the realm is
+  # imported from keycloak/realm-gridwise.json at every start of a new container. Memory: the JVM heap is capped at 384 MB and the
+  # container at 700 MB.
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.8.2}
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-kcadmin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-kcadmin_dev_pw}
+      KC_HTTP_RELATIVE_PATH: /auth
+      # The public address (through nginx). It follows WEB_PORT, so the issuer is right in every environment.
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-http://localhost:${WEB_PORT:-5100}/auth}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_APPEND: -Xms128m -Xmx384m
+    mem_limit: 700m
+    volumes:
+      - ./keycloak/realm-gridwise.json:/opt/keycloak/data/import/realm-gridwise.json:ro
+    # Health is on the management port 9000, under the relative path. The image has no curl or wget, so bash's /dev/tcp asks.
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 30s
+
   # Grafana, Tempo (traces), Loki (logs) and Prometheus/Mimir (metrics) in one container, with an OTLP receiver (4317 gRPC, 4318 HTTP).
   # The services send to it inside the network; only Grafana is published. It is the heaviest part of the system: about 0.6 GB of memory (measured when idle; it grows with the amount of data kept)
   # and an image of about 1 GB. Nothing depends on it, so the services also run when it is stopped.
