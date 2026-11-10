@@ -39,6 +39,13 @@ public static partial class GatewayAuthentication
                 // The keys come from Keycloak's internal address; the issuer in the tokens is the public one (what the browser uses).
                 options.MetadataAddress = jwt["MetadataAddress"] ?? throw new InvalidOperationException("Jwt:MetadataAddress is not configured.");
                 options.RequireHttpsMetadata = jwt.GetValue("RequireHttpsMetadata", true);
+                // After Keycloak is recreated (dev mode starts with a new embedded database, so it has new signing keys), tokens
+                // carry a key id the cached keys do not know. With RefreshOnIssuerKeyNotFound the handler then fetches the keys
+                // again, but at most once per RefreshInterval; the default of 5 minutes would reject every token for up to
+                // 5 minutes. 30 s keeps that window short, and still limits how often a token with an unknown key id (a forged
+                // one, for example) can make the service call Keycloak.
+                options.RefreshOnIssuerKeyNotFound = true;
+                options.RefreshInterval = TimeSpan.FromSeconds(jwt.GetValue("KeyRefreshIntervalSeconds", 30));
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters.ValidIssuer = issuer;
                 options.TokenValidationParameters.ValidAudience = audience; // one of the token's audiences must match
