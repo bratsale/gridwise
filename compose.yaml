@@ -298,7 +298,7 @@ services:
       start_period: 20s
 
   # Every client logs in with its own SASL/SCRAM-SHA-512 user (catalog, recommendation, batch, kafka-admin for kafka-init and tools);
-  # kafka/start.sh creates the users. No topic permissions yet: any logged-in user may do anything.
+  # kafka/start.sh creates the users; kafka-init gives each one access to its own topics only (ACLs).
   # The listeners: INTERNAL (kafka:9092, the services) and EXTERNAL (localhost:9094, the host) need a login. BROKER and CONTROLLER
   # are bound to 127.0.0.1 inside the container (the broker talking to itself, and the tools in kafka/start.sh), unreachable from
   # the network. Without TLS (SASL_PLAINTEXT) the traffic is not encrypted: production would use SASL_SSL.
@@ -315,6 +315,14 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+      # Authorization: nothing is allowed unless an ACL allows it (kafka-init creates them).
+      # Super users: kafka-admin (kafka-init, tools), and User:ANONYMOUS, the principal of the PLAINTEXT listeners BROKER and
+      # CONTROLLER. Those are bound to 127.0.0.1 inside this container, so nothing on the network can connect to them: only the
+      # broker itself and commands run with docker exec in this container, and whoever can exec here controls Kafka anyway.
+      # The SASL listeners never give ANONYMOUS: a client there is a logged-in user or nothing.
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: User:kafka-admin;User:ANONYMOUS
       # The image turns ___ into - and _ into . : listener.name.internal.scram-sha-512.sasl.jaas.config
       KAFKA_LISTENER_NAME_INTERNAL_SCRAM___SHA___512_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required;
       KAFKA_LISTENER_NAME_EXTERNAL_SCRAM___SHA___512_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required;
@@ -371,6 +379,20 @@ services:
         create ${KAFKA_PARTITIONS:-3} --topic batch.results --config retention.ms=-1
         create ${KAFKA_PARTITIONS:-3} --topic batch.dlq
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --list
+
+        # Least privilege: each service may use its own topics and consumer groups, nothing else (see docs/events/README.md).
+        # Write and Read include Describe. An idempotent producer needs no cluster permission: Write on a topic is enough.
+        # Adding an ACL that exists is a no-op, so this runs at every start.
+        acl() { /opt/kafka/bin/kafka-acls.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --add "$$@" > /dev/null; }
+        acl --allow-principal User:catalog --operation Write --topic catalog.plan-events --topic catalog.tax-group-events
+        acl --allow-principal User:recommendation --operation Read \
+          --topic catalog.plan-events --topic catalog.tax-group-events --topic batch.chunks --topic recommendation.dlq
+        acl --allow-principal User:recommendation --operation Write --topic recommendation.events --topic recommendation.dlq --topic batch.results
+        acl --allow-principal User:recommendation --operation Read --group recommendation --group batch-workers --group recommendation-dlq-reprocess
+        acl --allow-principal User:batch --operation Write --topic batch.chunks --topic batch.dlq
+        acl --allow-principal User:batch --operation Read --topic batch.results --topic batch.dlq
+        acl --allow-principal User:batch --operation Read --group batch --group batch-dlq-reprocess
+        /opt/kafka/bin/kafka-acls.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --list
 
 volumes:
   catalog-db-data:

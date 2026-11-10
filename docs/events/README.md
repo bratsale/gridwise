@@ -248,6 +248,33 @@ It works like the Recommendation command: it handles the messages that are in `b
 and exits with 0 or 1. A message that fails again, or has an unknown or missing `source-topic`, is written to the end of `batch.dlq` with `attempt` + 1.
 Applying a result is idempotent, so running it twice is safe.
 
+## Security: users and permissions
+
+Every client logs in to Kafka with its own user (SASL/SCRAM-SHA-512; the password is never sent, only a proof of it), and may use
+only the topics and consumer groups it needs (ACLs, with `allow.everyone.if.no.acl.found=false`: what is not allowed is denied).
+`kafka/start.sh` creates the users at every start, kafka-init creates the topics and the ACLs, and `scripts/kafka-acl-check.sh`
+checks both (rejected without a login, denied where not allowed, working where allowed).
+
+| User | Used by | Write | Read | Consumer groups |
+|---|---|---|---|---|
+| `catalog` | catalog (outbox publisher) | `catalog.plan-events`, `catalog.tax-group-events` | - | - |
+| `recommendation` | recommendation, recommendation-worker, `reprocess-dlq` | `recommendation.events`, `recommendation.dlq`, `batch.results` | `catalog.plan-events`, `catalog.tax-group-events`, `batch.chunks`, `recommendation.dlq` | `recommendation`, `batch-workers`, `recommendation-dlq-reprocess` |
+| `batch` | batch, its `reprocess-dlq` | `batch.chunks`, `batch.dlq` | `batch.results`, `batch.dlq` | `batch`, `batch-dlq-reprocess` |
+| `kafka-admin` | kafka-init, scripts and the commands in these docs | super user | super user | super user |
+
+Write and Read include Describe; an idempotent producer needs no permission on the cluster, Write on its topic is enough.
+The PLAINTEXT listeners of the broker itself (inter-broker and controller) are bound to 127.0.0.1 inside the kafka container and
+their principal (`ANONYMOUS`) is a super user: nothing on the network can reach them, and whoever can `docker exec` into the
+container controls Kafka anyway.
+
+Why least privilege: a service whose password leaks, or that has a bug, can only touch its own topics. Catalog cannot fake batch
+chunks, batch cannot read the plan events, and nobody but catalog can publish plan changes that every consumer would trust.
+An event's producer is therefore known from its topic, which is why events need no token or signature of their own (see above).
+
+**Production** would add TLS on the client listeners (SASL_SSL): without it the login is protected (SCRAM sends no password), but
+the messages travel in clear text and anyone on the network can read them. It would also keep the passwords in a secrets store and
+rotate them (changing a password here: set the variable, restart Kafka and the service).
+
 ## Monitoring the pipeline
 
 Three numbers tell whether events flow from Catalog to Recommendation:

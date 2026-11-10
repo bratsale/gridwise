@@ -35,4 +35,4 @@ Zadatak traži OIDC provajdera identiteta sa konfiguracijom u repozitorijumu, dv
 - Brojači rate limitinga su u memoriji jedne instance gatewaya; za više instanci treba zajedničko skladište (npr. Redis).
 - Gateway vjeruje X-Forwarded-For samo od nginxa.
 - Keycloak u dev režimu ponovo uvozi realm pri svakom pravljenju kontejnera; izmjene se rade u JSON-u.
-- Kafka lokalno nema autentifikaciju servisa; u produkciji SASL i ACL po topicu.
+- Servisi se Kafki prijavljuju svaki svojim korisnikom (SASL/SCRAM-SHA-512), a ACL-ovi im dozvoljavaju samo njihove topice i consumer grupe; lokalno bez TLS-a, u produkciji SASL_SSL.

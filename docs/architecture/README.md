@@ -55,7 +55,7 @@ flowchart TB
     recdb[("<b>recommendation-db</b><br/>PostgreSQL")]
     batchdb[("<b>batch-db</b><br/>PostgreSQL")]
 
-    kafka[["<b>Kafka</b><br/>one broker, 7 topics"]]
+    kafka[["<b>Kafka</b><br/>one broker, 7 topics<br/>SASL/SCRAM login per service,<br/>ACLs: each service its own topics"]]
 
     browser -->|"HTTP: page and static files"| web
     gateway["<b>gateway</b><br/>YARP reverse proxy (host 5104, debugging)<br/>/api/&lt;service&gt;/* to the service"]
