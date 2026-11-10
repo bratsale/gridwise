@@ -110,11 +110,11 @@ static async Task<int> ReprocessDlqAsync(string[] args)
         Acks = Acks.All,
         EnableIdempotence = true,
         MessageTimeoutMs = 10000
-    }).Build();
+    }.WithKafkaCredentials(builder.Configuration)).Build();
 
     var result = await DlqReprocessor.RunAsync(
         () => new BatchDbContext(options),
-        new ConsumerConfig { BootstrapServers = bootstrapServers }, producer, logger, CancellationToken.None);
+        new ConsumerConfig { BootstrapServers = bootstrapServers }.WithKafkaCredentials(builder.Configuration), producer, logger, CancellationToken.None);
     producer.Flush(TimeSpan.FromSeconds(5));
 
     Console.WriteLine($"Reprocessed: {result.Reprocessed}, failed again: {result.FailedAgain}");

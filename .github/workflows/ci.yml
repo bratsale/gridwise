@@ -150,6 +150,10 @@ jobs:
       CATALOG_DB_PASSWORD: ${{ secrets.DEV_CATALOG_DB_PASSWORD || 'catalog_dev_pw' }}
       RECOMMENDATION_DB_PASSWORD: ${{ secrets.DEV_RECOMMENDATION_DB_PASSWORD || 'recommendation_dev_pw' }}
       BATCH_DB_PASSWORD: ${{ secrets.DEV_BATCH_DB_PASSWORD || 'batch_dev_pw' }}
+      KAFKA_ADMIN_PASSWORD: ${{ secrets.DEV_KAFKA_ADMIN_PASSWORD || 'kafka_admin_dev_pw' }}
+      KAFKA_CATALOG_PASSWORD: ${{ secrets.DEV_KAFKA_CATALOG_PASSWORD || 'catalog_kafka_dev_pw' }}
+      KAFKA_RECOMMENDATION_PASSWORD: ${{ secrets.DEV_KAFKA_RECOMMENDATION_PASSWORD || 'recommendation_kafka_dev_pw' }}
+      KAFKA_BATCH_PASSWORD: ${{ secrets.DEV_KAFKA_BATCH_PASSWORD || 'batch_kafka_dev_pw' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/deploy

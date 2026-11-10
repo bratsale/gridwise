@@ -185,10 +185,11 @@ The key and value are copied unchanged. Headers:
 | error | Why it failed (the last error) |
 | attempt | Set by the reprocess command: how many times reprocessing has failed so far (absent = never reprocessed) |
 
-Inspect it:
+Inspect it (Kafka needs a login: the tools run inside the kafka container as `kafka-admin`, with the client properties
+file `/tmp/admin-client.properties` that `kafka/start.sh` writes there):
 
 ```
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties \
   --topic recommendation.dlq --from-beginning --timeout-ms 10000 \
   --property print.key=true --property print.headers=true
 ```
@@ -231,7 +232,7 @@ An event of an unknown type is skipped. The key and value are copied unchanged, 
 Inspect it:
 
 ```
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties \
   --topic batch.dlq --from-beginning --timeout-ms 10000 \
   --property print.key=true --property print.headers=true
 ```
@@ -266,11 +267,11 @@ docker compose exec -T catalog-db psql -U catalog -d catalog -c \
 
 # consumer lag: the LAG column per partition
 docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh \
-  --bootstrap-server localhost:9092 --describe --group recommendation
+  --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --describe --group recommendation
 
 # DLQ size: end offsets minus start offsets (--time -1 = end, -2 = start), summed over partitions
 docker compose exec kafka /opt/kafka/bin/kafka-get-offsets.sh \
-  --bootstrap-server localhost:9092 --topic recommendation.dlq --time -1
+  --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --topic recommendation.dlq --time -1
 ```
 
 "Events are late" checklist:

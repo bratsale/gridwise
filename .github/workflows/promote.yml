@@ -34,6 +34,10 @@ jobs:
       CATALOG_DB_PASSWORD: ${{ secrets[format('{0}_CATALOG_DB_PASSWORD', inputs.environment)] || 'catalog_dev_pw' }}
       RECOMMENDATION_DB_PASSWORD: ${{ secrets[format('{0}_RECOMMENDATION_DB_PASSWORD', inputs.environment)] || 'recommendation_dev_pw' }}
       BATCH_DB_PASSWORD: ${{ secrets[format('{0}_BATCH_DB_PASSWORD', inputs.environment)] || 'batch_dev_pw' }}
+      KAFKA_ADMIN_PASSWORD: ${{ secrets[format('{0}_KAFKA_ADMIN_PASSWORD', inputs.environment)] || 'kafka_admin_dev_pw' }}
+      KAFKA_CATALOG_PASSWORD: ${{ secrets[format('{0}_KAFKA_CATALOG_PASSWORD', inputs.environment)] || 'catalog_kafka_dev_pw' }}
+      KAFKA_RECOMMENDATION_PASSWORD: ${{ secrets[format('{0}_KAFKA_RECOMMENDATION_PASSWORD', inputs.environment)] || 'recommendation_kafka_dev_pw' }}
+      KAFKA_BATCH_PASSWORD: ${{ secrets[format('{0}_KAFKA_BATCH_PASSWORD', inputs.environment)] || 'batch_kafka_dev_pw' }}
     steps:
       - uses: actions/checkout@v7
 

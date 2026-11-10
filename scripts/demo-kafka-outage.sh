@@ -101,7 +101,7 @@ step "8. Read $TOPIC from the beginning"
 echo "Does: kafka-console-consumer with print.key, timeout 10 s; counts messages with key $PLAN_ID."
 expect "exactly 2 messages with this key."
 COUNT=$(docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 --topic "$TOPIC" --from-beginning \
+  --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --topic "$TOPIC" --from-beginning \
   --timeout-ms 10000 --property print.key=true 2>/dev/null \
   | grep -c "^${PLAN_ID}"$'\t' || true)
 echo "Messages with key $PLAN_ID: $COUNT"

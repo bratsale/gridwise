@@ -35,6 +35,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
+      Kafka__Username: catalog
+      Kafka__Password: ${KAFKA_CATALOG_PASSWORD:-catalog_kafka_dev_pw}
+      Kafka__SaslMechanism: SCRAM-SHA-512
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
       OTEL_SERVICE_NAME: catalog
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
@@ -80,6 +84,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
+      Kafka__Username: recommendation
+      Kafka__Password: ${KAFKA_RECOMMENDATION_PASSWORD:-recommendation_kafka_dev_pw}
+      Kafka__SaslMechanism: SCRAM-SHA-512
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
       OTEL_SERVICE_NAME: recommendation
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
@@ -109,6 +117,10 @@ services:
     environment:
       ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
+      Kafka__Username: recommendation
+      Kafka__Password: ${KAFKA_RECOMMENDATION_PASSWORD:-recommendation_kafka_dev_pw}
+      Kafka__SaslMechanism: SCRAM-SHA-512
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
       OTEL_SERVICE_NAME: recommendation-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
@@ -148,6 +160,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
       Kafka__BootstrapServers: kafka:9092
+      # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
+      Kafka__Username: batch
+      Kafka__Password: ${KAFKA_BATCH_PASSWORD:-batch_kafka_dev_pw}
+      Kafka__SaslMechanism: SCRAM-SHA-512
       Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
       OTEL_SERVICE_NAME: batch
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4318}
@@ -281,17 +297,27 @@ services:
       retries: 30
       start_period: 20s
 
+  # Every client logs in with its own SASL/SCRAM-SHA-512 user (catalog, recommendation, batch, kafka-admin for kafka-init and tools);
+  # kafka/start.sh creates the users. No topic permissions yet: any logged-in user may do anything.
+  # The listeners: INTERNAL (kafka:9092, the services) and EXTERNAL (localhost:9094, the host) need a login. BROKER and CONTROLLER
+  # are bound to 127.0.0.1 inside the container (the broker talking to itself, and the tools in kafka/start.sh), unreachable from
+  # the network. Without TLS (SASL_PLAINTEXT) the traffic is not encrypted: production would use SASL_SSL.
   kafka:
     image: ${KAFKA_IMAGE:-apache/kafka:4.4.0}
+    entrypoint: ["bash", "/opt/gridwise/start.sh"]
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT:-9094}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,BROKER://127.0.0.1:9095,CONTROLLER://127.0.0.1:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT:-9094},BROKER://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,BROKER:PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+      # The image turns ___ into - and _ into . : listener.name.internal.scram-sha-512.sasl.jaas.config
+      KAFKA_LISTENER_NAME_INTERNAL_SCRAM___SHA___512_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required;
+      KAFKA_LISTENER_NAME_EXTERNAL_SCRAM___SHA___512_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required;
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -299,17 +325,26 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xmx512M -Xms256M}
+      # The users' passwords (read by kafka/start.sh).
+      KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:-kafka_admin_dev_pw}
+      KAFKA_CATALOG_PASSWORD: ${KAFKA_CATALOG_PASSWORD:-catalog_kafka_dev_pw}
+      KAFKA_RECOMMENDATION_PASSWORD: ${KAFKA_RECOMMENDATION_PASSWORD:-recommendation_kafka_dev_pw}
+      KAFKA_BATCH_PASSWORD: ${KAFKA_BATCH_PASSWORD:-batch_kafka_dev_pw}
     ports:
       - "${KAFKA_EXTERNAL_PORT:-9094}:9094"
     volumes:
       - kafka-data:/var/lib/kafka/data
+      - ./kafka/start.sh:/opt/gridwise/start.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      # Healthy once the users exist (start.sh) and the broker answers.
+      test: ["CMD-SHELL", "test -f /tmp/scram-users-ready && KAFKA_HEAP_OPTS=-Xmx64m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9095 > /dev/null"]
       interval: 5s
-      retries: 20
+      retries: 30
 
   kafka-init:
     image: ${KAFKA_IMAGE:-apache/kafka:4.4.0}
+    environment:
+      KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:-kafka_admin_dev_pw}
     depends_on:
       kafka:
         condition: service_healthy
@@ -318,10 +353,14 @@ services:
     command:
       - |
         set -e
+        # Logs in as kafka-admin (the tools' user).
+        printf '%s\n' 'security.protocol=SASL_PLAINTEXT' 'sasl.mechanism=SCRAM-SHA-512' \
+          "sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username=\"kafka-admin\" password=\"$$KAFKA_ADMIN_PASSWORD\";" \
+          > /tmp/admin-client.properties
         create() {
           partitions=$$1
           shift
-          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --create --if-not-exists \
             --partitions $$partitions --replication-factor 1 "$$@"
         }
         create ${KAFKA_PARTITIONS:-3} --topic catalog.plan-events --config retention.ms=-1
@@ -331,7 +370,7 @@ services:
         create 6 --topic batch.chunks --config retention.ms=-1
         create ${KAFKA_PARTITIONS:-3} --topic batch.results --config retention.ms=-1
         create ${KAFKA_PARTITIONS:-3} --topic batch.dlq
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --list
 
 volumes:
   catalog-db-data:

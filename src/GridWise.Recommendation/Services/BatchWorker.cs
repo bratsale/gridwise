@@ -35,14 +35,14 @@ public class BatchWorker(
             HeartbeatIntervalMs = config.GetValue("Kafka:HeartbeatIntervalMs", DefaultHeartbeatIntervalMs),
             EnableAutoCommit = false,
             AutoOffsetReset = AutoOffsetReset.Earliest
-        }).Build();
+        }.WithKafkaCredentials(config)).Build();
         using var producer = new ProducerBuilder<string, string>(new ProducerConfig
         {
             BootstrapServers = bootstrapServers,
             Acks = Acks.All,
             EnableIdempotence = true,
             MessageTimeoutMs = 10000
-        }).Build();
+        }.WithKafkaCredentials(config)).Build();
 
         consumer.Subscribe(Topics.BatchChunks);
 

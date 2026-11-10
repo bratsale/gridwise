@@ -25,7 +25,7 @@ public class OutboxPublisher(
             Acks = Acks.All,
             EnableIdempotence = true,
             MessageTimeoutMs = 10000
-        }).Build();
+        }.WithKafkaCredentials(config)).Build();
 
         try
         {

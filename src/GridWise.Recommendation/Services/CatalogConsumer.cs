@@ -44,14 +44,14 @@ public class CatalogConsumer(
             GroupId = config["Kafka:GroupId"],
             EnableAutoCommit = false,
             AutoOffsetReset = AutoOffsetReset.Earliest
-        }).Build();
+        }.WithKafkaCredentials(config)).Build();
         using var producer = new ProducerBuilder<string, string>(new ProducerConfig
         {
             BootstrapServers = bootstrapServers,
             Acks = Acks.All,
             EnableIdempotence = true,
             MessageTimeoutMs = 10000
-        }).Build();
+        }.WithKafkaCredentials(config)).Build();
 
         consumer.Subscribe([Topics.CatalogPlanEvents, Topics.CatalogTaxGroupEvents]);
 

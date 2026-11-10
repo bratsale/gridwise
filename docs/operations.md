@@ -63,7 +63,7 @@ the dead-letter topic until it is reprocessed.
 **What to do.**
 1. Read the message and its `error` header (what failed and why); the commands are in `docs/events/README.md`
    ("Dead-letter topic"), for example:
-   `docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic recommendation.dlq --from-beginning --timeout-ms 10000 --property print.key=true --property print.headers=true`
+   `docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 --command-config /tmp/admin-client.properties --topic recommendation.dlq --from-beginning --timeout-ms 10000 --property print.key=true --property print.headers=true`
 2. Fix the cause: a bug or a missing version in the consumer, data that needed something that has arrived since, or a message
    that was wrong in the first place.
 3. Reprocess: `docker compose run --rm recommendation reprocess-dlq` (or `batch reprocess-dlq` for `batch.dlq`). A message that
@@ -92,8 +92,8 @@ Symptoms: a plan changed in the admin does not appear in recommendations, or a b
 4. **Pipeline status.** `scripts/pipeline-status.sh` shows, from the databases and Kafka directly, the outbox backlog of catalog and
    recommendation, the lag of the group `recommendation` and the size of `recommendation.dlq`. For batch, the same view by hand:
    ```
-   docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group batch-workers
-   docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group batch
+   docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --describe --group batch-workers
+   docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --describe --group batch
    docker compose exec batch-db psql -U batch -d batch -c "select count(*), min(occurred_at) from outbox_messages where published_at is null"
    ```
 5. **Dead-letter topics and reprocessing.** If messages were dead-lettered, read them, fix the cause and run `reprocess-dlq`

@@ -26,7 +26,7 @@ snapshot() {
     $(docker compose ps -q batch recommendation recommendation-worker batch-db recommendation-db kafka) | sort
   echo "  lag (current-offset, log-end-offset, lag) per partition:"
   for group in batch-workers batch; do
-    docker compose exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group "$group" 2>/dev/null \
+    docker compose exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --command-config /tmp/admin-client.properties --describe --group "$group" 2>/dev/null \
       | awk -v g="$group" 'NR > 2 && $1 != "" && $2 ~ /^batch\./ { lag += $6; end += $5; printf "  %s %s[%s] lag=%s\n", g, $2, $3, $6 } END { printf "  %s total lag=%d\n", g, lag }'
   done
   echo "  unpublished outbox rows: batch=$(psql_batch "SELECT count(*) FROM outbox_messages WHERE published_at IS NULL") recommendation=$(psql_recommendation "SELECT count(*) FROM outbox_messages WHERE published_at IS NULL")"

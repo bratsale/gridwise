@@ -29,7 +29,15 @@ public static class DlqReprocessor
 
         // High watermarks at start: the end of the topic that this run has to reach.
         var endOffsets = new Dictionary<TopicPartition, long>();
-        using (var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = consumerConfig.BootstrapServers }).Build())
+        using (var admin = new AdminClientBuilder(new AdminClientConfig
+               {
+                   BootstrapServers = consumerConfig.BootstrapServers,
+                   // The same login as the consumer.
+                   SecurityProtocol = consumerConfig.SecurityProtocol,
+                   SaslMechanism = consumerConfig.SaslMechanism,
+                   SaslUsername = consumerConfig.SaslUsername,
+                   SaslPassword = consumerConfig.SaslPassword
+               }).Build())
         {
             var topic = admin.GetMetadata(Topics.BatchDlq, TimeSpan.FromSeconds(10)).Topics.Single();
             foreach (var partition in topic.Partitions)
