@@ -173,6 +173,10 @@ services:
       ReverseProxy__Clusters__catalog__Destinations__main__Address: http://catalog:8080/
       ReverseProxy__Clusters__recommendation__Destinations__main__Address: http://recommendation:8080/
       ReverseProxy__Clusters__batch__Destinations__main__Address: http://batch:8080/
+      # Bearer tokens: keys from Keycloak's internal address (plain HTTP inside the compose network), issuer = the public address.
+      Jwt__MetadataAddress: http://keycloak:8080/auth/realms/gridwise/.well-known/openid-configuration
+      Jwt__RequireHttpsMetadata: "false"
+      Jwt__Issuer: ${KEYCLOAK_HOSTNAME:-http://localhost:${WEB_PORT:-5100}/auth}/realms/gridwise
     # Published for debugging only; the browser goes through web (nginx).
     ports:
       - "${GATEWAY_PORT:-5104}:8080"
@@ -183,6 +187,8 @@ services:
       retries: 20
       start_period: 5s
     depends_on:
+      keycloak:
+        condition: service_healthy
       catalog:
         condition: service_healthy
       recommendation:
@@ -218,6 +224,9 @@ services:
       KC_HTTP_RELATIVE_PATH: /auth
       # The public address (through nginx). It follows WEB_PORT, so the issuer is right in every environment.
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-http://localhost:${WEB_PORT:-5100}/auth}
+      # Called from inside the network (the gateway reads the keys at http://keycloak:8080), Keycloak answers with backchannel
+      # URLs (jwks_uri, token endpoint) on that address; the issuer stays the public one above.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_PROXY_HEADERS: xforwarded
       KC_HEALTH_ENABLED: "true"
       JAVA_OPTS_APPEND: -Xms128m -Xmx384m

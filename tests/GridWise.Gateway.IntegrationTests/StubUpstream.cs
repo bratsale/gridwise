@@ -1,4 +1,4 @@
-using System.Text.Json;
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace GridWise.Gateway.IntegrationTests;
 
 /// <summary>What a stub service saw, echoed back as the response body.</summary>
-public record Echo(string Upstream, string Method, string Path, string Query, int BodyLength, string Body);
+public record Echo(string Upstream, string Method, string Path, string Query, int BodyLength, string Body, string? Authorization);
 
 /// <summary>
 /// A stand-in for one service behind the gateway: a real Kestrel server on a free port that answers every request with an
@@ -25,6 +25,9 @@ public sealed class StubUpstream : IAsyncDisposable
 
     public string Address { get; private set; } = "";
 
+    /// <summary>Every request this stub received, in order (the streaming one included).</summary>
+    public ConcurrentQueue<Echo> Received { get; } = new();
+
     public void ReleaseStream() => _release.TrySetResult();
 
     public static async Task<StubUpstream> StartAsync(string name)
@@ -37,6 +40,8 @@ public sealed class StubUpstream : IAsyncDisposable
 
         app.MapGet("/jobs/{id}/events", async (HttpContext http) =>
         {
+            stub.Received.Enqueue(new Echo(name, http.Request.Method, http.Request.Path, http.Request.QueryString.Value ?? "", 0, "",
+                http.Request.Headers.Authorization.ToString()));
             http.Response.ContentType = "text/event-stream";
             await http.Response.WriteAsync("data: first\n\n");
             await http.Response.Body.FlushAsync();
@@ -49,7 +54,8 @@ public sealed class StubUpstream : IAsyncDisposable
             using var reader = new StreamReader(http.Request.Body);
             var body = await reader.ReadToEndAsync();
             var echo = new Echo(name, http.Request.Method, http.Request.Path, http.Request.QueryString.Value ?? "",
-                body.Length, body.Length <= 10_000 ? body : "");
+                body.Length, body.Length <= 10_000 ? body : "", http.Request.Headers.Authorization.ToString());
+            stub.Received.Enqueue(echo);
             await http.Response.WriteAsJsonAsync(echo);
         });
 

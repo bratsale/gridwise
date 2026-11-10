@@ -8,9 +8,9 @@ public class HealthTests(GatewayFixture gateway)
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
-    public async Task Health_endpoints_answer_healthy(string path)
+    public async Task Health_endpoints_answer_healthy_without_a_token(string path)
     {
-        var response = await gateway.CreateClient().GetAsync(path);
+        var response = await gateway.CreateAnonymousClient().GetAsync(path);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());

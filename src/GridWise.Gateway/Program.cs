@@ -1,13 +1,21 @@
+using GridWise.Gateway.Authentication;
 using GridWise.Gateway.Telemetry;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Yarp.ReverseProxy;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddGridWiseTelemetry("gateway");
+builder.AddGatewayAuthentication();
 
 // Routes and clusters come from the "ReverseProxy" section: appsettings.json, overridden by environment variables
 // (for example ReverseProxy__Clusters__catalog__Destinations__main__Address).
-builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddTransforms(context =>
+    {
+        if (context.Route.RouteId == "batch-events")
+            GatewayAuthentication.AddQueryTokenForwarding(context);
+    });
 
 // Ready once the proxy has routes to serve. The services behind it have their own health checks.
 builder.Services.AddHealthChecks().AddCheck<RoutesLoadedCheck>("routes-loaded", tags: ["ready"]);
@@ -15,9 +23,11 @@ builder.Services.AddHealthChecks().AddCheck<RoutesLoadedCheck>("routes-loaded", 
 var app = builder.Build();
 
 app.UseCorrelationId();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false });
-app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") });
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 app.MapReverseProxy();
 
 app.Run();
