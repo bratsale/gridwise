@@ -13,11 +13,12 @@ Keycloak is served by the web container's nginx at http://localhost:5100/auth. T
 | Realm roles | `admin`, `customer` (in the token as `realm_access.roles`) |
 | Users | `admin` / `admin_dev_pw` (role admin), `customer` / `customer_dev_pw` (role customer); both also have `default-roles-gridwise`, which lets them use the account console (it adds `account` to `aud` and `offline_access`, `uma_authorization` to the roles) |
 | `gridwise-web` | public client for the browser app: Authorization Code with PKCE (S256), redirect `http://localhost:5100/*` |
-| `gridwise-cli` | public client with direct access grants (username and password in one request) |
+| `gridwise-cli` | public client with direct access grants (username and password in one request); its access tokens live **30 minutes** (a client-level override; the realm default, used by `gridwise-web`, stays 5 minutes), so long scripts fetch one token at the start |
 | Audience | both clients put `gridwise-api` in the `aud` of the access token |
 | Admin console | http://localhost:5100/auth/admin, user `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` from `.env.example` |
 
-**Dev only.** The passwords above are for local development. `gridwise-cli` exists for scripts and smoke tests: direct access grants
+**Dev only.** The passwords above are for local development. `gridwise-cli` exists for scripts and smoke tests (`scripts/lib/auth.sh`,
+`get_token admin|customer`), and so does its longer token lifetime. Direct access grants
 send the user's password to the client and are deprecated in OAuth 2.1, so this client must not exist in a real environment, where
 scripts would use a confidential client with client credentials instead.
 

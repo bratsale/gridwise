@@ -20,7 +20,9 @@ k6 exits with 99 when a threshold is crossed, and so does `run.sh`.
 
 The test calls the recommendation service directly, not through the gateway (`localhost:5100/api/...`), so the gateway's rate limit
 (20 calculations per 10 s per user) does not affect the measurement: the NFR is about the service, and 50 requests/s from one
-user would be refused by the gateway by design.
+user would be refused by the gateway by design. The service checks the token itself, so `run.sh` gets a customer token from Keycloak
+(`scripts/lib/auth.sh`) and passes it to k6 as `TOKEN`; seeding uses an admin token. `TARGET_DURATION=10s` shortens the measured part
+of the target scenario, to check quickly that the script works (not for results).
 
 ## What is measured
 
@@ -70,8 +72,9 @@ bash scripts/resilience-batch-worker.sh    # kills a worker in the middle of a j
 ```
 
 Both leave the stack with the default of 2 workers (the throughput script also when it fails).
-These scripts upload through `http://localhost:5100/api/batch`, that is through the gateway: since the gateway checks tokens and
-limits uploads to 5 per minute per user, they need a token and must stay under that limit (or call batch directly on port 5103).
+These scripts call the batch service directly on port 5103, not through the gateway: what is measured is batch and the workers, and
+the gateway allows only 5 uploads per minute per user. Batch still checks the token, so they get an admin token from Keycloak once at
+the start (`scripts/lib/auth.sh`; tokens of the `gridwise-cli` client live 30 minutes, longer than a run).
 `ROWS`, `RUNS`, `WORKERS_LIST` and `TIMEOUT` can be set in the environment of the throughput script.
 
 ## Method

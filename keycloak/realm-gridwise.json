@@ -116,7 +116,10 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "attributes": {
+        "access.token.lifespan": "1800"
+      }
     }
   ]
 }

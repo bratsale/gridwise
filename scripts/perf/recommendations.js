@@ -27,7 +27,7 @@ const definitions = {
     scenarios: {
       warmup: warmupArrival,
       target: {
-        executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '60s', startTime: '10s',
+        executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: __ENV.TARGET_DURATION || '60s', startTime: '10s',
         preAllocatedVUs: 20, maxVUs: 50, exec: 'run',
       },
     },
@@ -66,7 +66,9 @@ export const options = {
 };
 
 const URL = __ENV.BASE_URL || 'http://localhost:5102';
-const HEADERS = { headers: { 'Content-Type': 'application/json' } };
+// A customer's access token (run.sh gets it from Keycloak): the service checks the token and the role itself.
+if (!__ENV.TOKEN) throw new Error('TOKEN is not set: run the test with scripts/perf/run.sh, which gets one from Keycloak.');
+const HEADERS = { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${__ENV.TOKEN}` } };
 
 export function run() {
   const body = JSON.stringify({

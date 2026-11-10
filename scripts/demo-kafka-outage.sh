@@ -4,6 +4,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source scripts/lib/auth.sh
+
+# Directly to the catalog service (not through the gateway): the demo is about catalog, its outbox and Kafka.
 API=http://localhost:5101
 TOPIC=catalog.plan-events
 
@@ -36,6 +39,9 @@ expect "stack is up and healthy."
 docker compose up -d --build --wait || { echo "FAIL: stack did not become healthy"; exit 1; }
 echo "Stack is healthy."
 
+TOKEN=$(get_token admin) # before Kafka is stopped; valid for 30 minutes, longer than the demo
+AUTH="Authorization: Bearer $TOKEN"
+
 step "2. Stop Kafka"
 echo "Does: docker compose stop kafka."
 expect "Kafka is down; the catalog API keeps working."
@@ -49,7 +55,7 @@ TODAY=$(date -u +%F)
 BODY="{\"name\":\"$NAME\",\"discount\":0.05,\"effectiveFrom\":\"$TODAY\",\"tiers\":[{\"threshold\":100,\"pricePerKwh\":0.10},{\"threshold\":null,\"pricePerKwh\":0.06}]}"
 
 HEADERS=$(curl -s -o /dev/null -D - -X POST "$API/plans" \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H "$AUTH" \
   -H "Idempotency-Key: demo-$(date -u +%s)-$RANDOM" \
   -d "$BODY" | sed 's/\r$//')
 echo "$HEADERS" | sed -n '1p'
@@ -58,7 +64,7 @@ PLAN_ID=$(echo "$HEADERS" | sed -n 's|^[Ll]ocation: /plans/\(.*\)$|\1|p')
 echo "Plan id: $PLAN_ID"
 
 STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/plans/$PLAN_ID/versions" \
-  -H 'Content-Type: application/json' -H 'If-Match: "1"' \
+  -H 'Content-Type: application/json' -H 'If-Match: "1"' -H "$AUTH" \
   -d "${BODY/\"name\":\"$NAME\"/\"name\":\"$NAME v2\"}")
 echo "Second version: HTTP $STATUS"
 [[ "$STATUS" == 201 ]] || { echo "FAIL: second version returned $STATUS"; exit 1; }

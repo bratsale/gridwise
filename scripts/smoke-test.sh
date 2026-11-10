@@ -7,6 +7,7 @@ set -euo pipefail
 if [ $# -ge 1 ]; then
   set -a; . "$1"; set +a
 fi
+source "$(dirname "$0")/lib/auth.sh"
 catalog=http://localhost:${CATALOG_PORT:-5101}
 recommendation=http://localhost:${RECOMMENDATION_PORT:-5102}
 batch=http://localhost:${BATCH_PORT:-5103}
@@ -18,9 +19,13 @@ for url in "$catalog/health/ready" "$recommendation/health/ready" "$batch/health
   echo "ok   $url"
 done
 
+# The health endpoints need no token; the recommendation does (a customer's, from Keycloak in the same stack).
+TOKEN=$(get_token customer)
+echo "ok   token for customer from Keycloak"
+
 # The plans reach the recommendation service through Kafka, so right after a start the first answers can be empty: retry.
 for attempt in $(seq 1 30); do
-  total=$(curl -fsS --max-time 10 -X POST "$web/api/recommendation/recommendations" -H 'Content-Type: application/json' \
+  total=$(curl -fsS --max-time 10 -X POST "$web/api/recommendation/recommendations" -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
     -d '{"consumptionKwh":250,"taxGroup":"household"}' | jq -r '.recommended.total // empty' || true)
   if [ -n "$total" ]; then
     echo "ok   recommendation for 250 kWh household: best total $total"

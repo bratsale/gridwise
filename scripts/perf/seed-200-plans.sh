@@ -4,10 +4,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+source scripts/lib/auth.sh
+
+# Directly to the catalog service: seeding is not part of the measurement, and the gateway's general rate limit would slow it down.
 API=http://localhost:5101
 WANT=200
+TOKEN=$(get_token admin)
+AUTH="Authorization: Bearer $TOKEN"
 
-perf_plans_in_catalog() { { curl -s "$API/plans" | grep -o '"name":"Perf plan' || true; } | wc -l; }
+perf_plans_in_catalog() { { curl -s -H "$AUTH" "$API/plans" | grep -o '"name":"Perf plan' || true; } | wc -l; }
 perf_plans_in_recommendation() {
   docker compose exec -T recommendation-db psql -U recommendation -d recommendation -At \
     -c "SELECT count(*) FROM plan_versions WHERE name LIKE 'Perf plan %'"
@@ -36,7 +41,7 @@ else
     esac
     NAME=$(printf 'Perf plan %03d' "$i")
     STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/plans" \
-      -H 'Content-Type: application/json' \
+      -H 'Content-Type: application/json' -H "$AUTH" \
       -H "Idempotency-Key: perf-$RUN-$i" \
       -d "{\"name\":\"$NAME\",\"discount\":$DISCOUNT,\"effectiveFrom\":\"$TODAY\",\"tiers\":$TIERS}")
     [[ "$STATUS" == 201 ]] || { echo "FAIL: $NAME returned HTTP $STATUS"; exit 1; }
