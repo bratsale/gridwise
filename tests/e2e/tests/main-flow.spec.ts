@@ -1,23 +1,28 @@
 import { expect, test } from '@playwright/test'
+import { apiToken, login } from './auth'
 
-// Creates a cheap plan (admin), finds it as the best offer (customer), accepts it, then retires it (admin).
-// The plan name is unique per run, so the test does not depend on what is already in the system.
+// The admin creates a cheap plan, a customer (in a browser of their own) finds it as the best offer and accepts it,
+// and the admin retires it. The plan name is unique per run, so the test does not depend on what is already in the system.
+
 // If the test fails before its own retire step, the plan would stay active and could tie with the next run's plan
-// for "best". This safety net retires any plan of this run that is still active (through the API, not the UI).
+// for "best". This safety net retires any plan of this run that is still active (through the API, as admin).
 let planName = ''
 test.afterEach(async ({ request }) => {
-  const plans = await (await request.get('/api/catalog/plans')).json() as { id: string; name: string; status: string }[]
+  const headers = { Authorization: `Bearer ${await apiToken(request, 'admin')}` }
+  const plans = await (await request.get('/api/catalog/plans', { headers })).json() as { id: string; name: string; status: string }[]
   for (const plan of plans.filter((p) => p.name === planName && p.status === 'Active')) {
-    const etag = (await request.get(`/api/catalog/plans/${plan.id}`)).headers()['etag']
-    await request.delete(`/api/catalog/plans/${plan.id}?effectiveFrom=${new Date().toISOString().slice(0, 10)}`, { headers: { 'If-Match': etag } })
+    const etag = (await request.get(`/api/catalog/plans/${plan.id}`, { headers })).headers()['etag']
+    await request.delete(`/api/catalog/plans/${plan.id}?effectiveFrom=${new Date().toISOString().slice(0, 10)}`, {
+      headers: { ...headers, 'If-Match': etag },
+    })
   }
 })
 
-test('a new plan becomes the best offer, can be accepted, and is retired afterwards', async ({ page }) => {
+test('a new plan becomes the best offer, can be accepted, and is retired afterwards', async ({ page, browser }) => {
   planName = `E2E Saver ${Date.now()}`
-  await page.goto('/')
 
   // --- Admin: create the plan ---
+  await login(page, 'admin')
   await page.getByRole('tab', { name: 'Admin' }).click()
   await page.getByRole('tab', { name: 'Plans' }).click()
   await page.getByRole('button', { name: 'New plan' }).click()
@@ -35,30 +40,37 @@ test('a new plan becomes the best offer, can be accepted, and is retired afterwa
   await expect(page.getByRole('status')).toContainText('Plan created')
   await expect(page.getByRole('row', { name: new RegExp(planName) })).toContainText('Active')
 
-  // --- Customer: calculate until the plan shows up (it reaches the recommendation service through Kafka) ---
-  await page.getByRole('tab', { name: 'Customer' }).click()
-  await page.getByLabel('Consumption').fill('250')
-  await page.getByLabel('Tax group').selectOption('household')
+  // --- Customer, in a separate browser context: calculate until the plan shows up (it reaches the recommendation service through Kafka) ---
+  const customerContext = await browser.newContext()
+  try {
+    const customer = await customerContext.newPage()
+    await login(customer, 'customer')
+    await customer.getByRole('tab', { name: 'Customer' }).click()
+    await customer.getByLabel('Consumption').fill('250')
+    await customer.getByLabel('Tax group').selectOption('household')
 
-  const planRow = page.getByRole('row', { name: new RegExp(planName) })
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Calculate' }).click()
-    await expect(planRow).toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] })
+    const planRow = customer.getByRole('row', { name: new RegExp(planName) })
+    await expect(async () => {
+      await customer.getByRole('button', { name: 'Calculate' }).click()
+      await expect(planRow).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] })
 
-  // It is the cheapest: first row of the table (after the header) and marked "Best".
-  await expect(page.getByRole('row').nth(1)).toContainText(planName)
-  await expect(planRow.getByText('Best', { exact: true })).toBeVisible()
+    // It is the cheapest: first row of the table (after the header) and marked "Best".
+    await expect(customer.getByRole('row').nth(1)).toContainText(planName)
+    await expect(planRow.getByText('Best', { exact: true })).toBeVisible()
 
-  // Breakdown.
-  await planRow.getByRole('button', { name: planName }).click()
-  for (const line of ['Energy subtotal', 'Discount', 'Net energy', 'Eco tax', 'VAT base', 'VAT', 'Total']) {
-    await expect(page.getByRole('row', { name: new RegExp(`^${line} -?[\\d.,]+$`) })).toBeVisible()
+    // Breakdown.
+    await planRow.getByRole('button', { name: planName }).click()
+    for (const line of ['Energy subtotal', 'Discount', 'Net energy', 'Eco tax', 'VAT base', 'VAT', 'Total']) {
+      await expect(customer.getByRole('row', { name: new RegExp(`^${line} -?[\\d.,]+$`) })).toBeVisible()
+    }
+
+    // Accept.
+    await planRow.getByRole('button', { name: 'Accept' }).click()
+    await expect(customer.getByText(`Accepted: ${planName}`)).toBeVisible()
+  } finally {
+    await customerContext.close()
   }
-
-  // Accept.
-  await planRow.getByRole('button', { name: 'Accept' }).click()
-  await expect(page.getByText(`Accepted: ${planName}`)).toBeVisible()
 
   // --- Admin: retire the plan (cleanup) ---
   await page.getByRole('tab', { name: 'Admin' }).click()

@@ -1,8 +1,10 @@
+import { useState } from 'react'
+import { useAuth } from '../../../../shared/auth/auth.ts'
 import { useFormat, useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog.tsx'
 import { ProgressBar } from '../../../../shared/ui/ProgressBar.tsx'
-import { errorsCsvUrl, isTerminal, resultsCsvUrl, type Job, type JobProgress } from '../api/batchApi.ts'
+import { downloadCsv, errorsCsvUrl, isTerminal, resultsCsvUrl, type Job, type JobProgress } from '../api/batchApi.ts'
 import { useCancelJob } from '../hooks/useCancelJob.ts'
 import { useJobProgress } from '../hooks/useJobProgress.ts'
 import { StatusBadge } from './StatusBadge.tsx'
@@ -19,7 +21,13 @@ export function JobDetail({
   const t = useT()
   const text = useMessageText()
   const format = useFormat()
-  const { progress, reconnecting } = useJobProgress(job.id, { onProgress, onTerminal: onFinished })
+  const { accessToken } = useAuth()
+  const { progress, reconnecting } = useJobProgress(job.id, { onProgress, onTerminal: onFinished, accessToken })
+  const [downloadFailed, setDownloadFailed] = useState(false)
+
+  async function download(url: string, fileName: string) {
+    setDownloadFailed(!(await downloadCsv(url, fileName)))
+  }
   const cancel = useCancelJob(job.id, onChanged)
 
   // The stream is the freshest source; the list row is what we know until its first event arrives.
@@ -45,6 +53,7 @@ export function JobDetail({
 
       {reconnecting && !done && <Banner kind="warning">{t('batch.reconnecting')}</Banner>}
       {cancel.error && <Banner kind="error">{text(cancel.error)}</Banner>}
+      {downloadFailed && <Banner kind="error">{t('batch.download.failed')}</Banner>}
 
       <div className="actions">
         {!done && (
@@ -52,10 +61,10 @@ export function JobDetail({
         )}
         {(current.status === 'Completed' || current.status === 'Cancelled') && (
           <>
-            <a className="button" href={resultsCsvUrl(job.id)} download>{t('batch.download.results')}</a>
-            <a className="button" href={errorsCsvUrl(job.id)} download>
+            <button type="button" onClick={() => void download(resultsCsvUrl(job.id), `results-${job.id}.csv`)}>{t('batch.download.results')}</button>
+            <button type="button" onClick={() => void download(errorsCsvUrl(job.id), `errors-${job.id}.csv`)}>
               {t('batch.download.errors', { count: format.integer(current.failedRows) })}
-            </a>
+            </button>
           </>
         )}
       </div>

@@ -44,8 +44,8 @@ type Hook = ReturnType<typeof useJobProgress>
 
 function mount(jobId: string, callbacks: Parameters<typeof useJobProgress>[1] = {}) {
   const holder: { current: Hook | null } = { current: null }
-  function Probe({ id }: { id: string }) {
-    const value = useJobProgress(id, callbacks)
+  function Probe({ id, token }: { id: string; token?: string }) {
+    const value = useJobProgress(id, { ...callbacks, accessToken: token ?? callbacks.accessToken })
     useEffect(() => {
       holder.current = value
     })
@@ -54,10 +54,36 @@ function mount(jobId: string, callbacks: Parameters<typeof useJobProgress>[1] = 
   const container = document.createElement('div')
   const root: Root = createRoot(container)
   act(() => root.render(<Probe id={jobId} />))
-  return { holder, root, rerender: (id: string) => act(() => root.render(<Probe id={id} />)) }
+  return {
+    holder, root,
+    rerender: (id: string, token?: string) => act(() => root.render(<Probe id={id} token={token} />)),
+  }
 }
 
 describe('useJobProgress', () => {
+  it('passes the access token in the URL and reconnects with the new token after a renewal', () => {
+    const { holder, rerender } = mount('job-1', { accessToken: 'token-1' })
+    const first = FakeEventSource.instances[0]
+    expect(first.url).toBe('/api/batch/jobs/job-1/events?access_token=token-1')
+    act(() => first.send(running(1)))
+
+    rerender('job-1', 'token-2')
+
+    expect(first.closed).toBe(true)
+    expect(FakeEventSource.instances).toHaveLength(2)
+    expect(FakeEventSource.instances[1].url).toBe('/api/batch/jobs/job-1/events?access_token=token-2')
+    expect(holder.current?.progress?.completedChunks).toBe(1) // the progress shown stays until the next event
+  })
+
+  it('does not reopen a finished job when the token is renewed', () => {
+    const { rerender } = mount('job-2', { accessToken: 'token-1' })
+    act(() => FakeEventSource.instances[0].send({ ...running(4), status: 'Completed' }))
+
+    rerender('job-2', 'token-2')
+
+    expect(FakeEventSource.instances).toHaveLength(1)
+  })
+
   beforeEach(() => {
     FakeEventSource.instances = []
     vi.stubGlobal('EventSource', FakeEventSource)

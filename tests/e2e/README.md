@@ -1,12 +1,26 @@
 # GridWise end-to-end tests
 
-Playwright tests that drive the real UI of the running compose stack. Chromium only.
+Playwright tests that drive the real UI of the running compose stack, logging in through the real Keycloak login page. Chromium only.
 
-- `tests/main-flow.spec.ts`: admin creates a plan (20 % discount, 100 kWh at 0.05, the rest at 0.04), the customer calculates 250 kWh
-  (household) and finds it first and marked "Best", opens its breakdown and accepts it, then the admin retires the plan.
-  The plan name is unique per run. The calculation is retried for up to 30 s, because a new plan reaches the recommendation service through Kafka.
-  If the test fails before its retire step, an `afterEach` retires the plan through the API so it cannot tie with the next run's plan.
-- `tests/batch.spec.ts`: uploads `src/GridWise.Web/public/sample-batch.csv` on the Batch page and waits for Completed with 18 processed and 2 failed rows.
+- `tests/main-flow.spec.ts`: the **admin** creates a plan (20 % discount, 100 kWh at 0.05, the rest at 0.04); a **customer**, in a
+  separate browser context, calculates 250 kWh (household), finds it first and marked "Best", opens its breakdown and accepts it;
+  then the admin retires the plan. The plan name is unique per run. The calculation is retried for up to 30 s, because a new plan
+  reaches the recommendation service through Kafka. If the test fails before its retire step, an `afterEach` retires the plan
+  through the API (with an admin token from the `gridwise-cli` client).
+- `tests/batch.spec.ts`: as **admin**, uploads `src/GridWise.Web/public/sample-batch.csv` on the Batch page and waits for Completed
+  with 18 processed and 2 failed rows.
+- `tests/permissions.spec.ts`: a **customer** sees no Admin tab and `#admin/plans` shows "You don't have permission for this.";
+  without a login the app asks to log in.
+- `tests/auth.ts`: logging in through Keycloak, and an API token for the tests' own cleanup calls.
+
+## Test users
+
+The dev users of the `gridwise` realm (`keycloak/realm-gridwise.json`):
+
+| User | Password | Role | Used for |
+|---|---|---|---|
+| `admin` | `admin_dev_pw` | admin | creating and retiring the plan, batch |
+| `customer` | `customer_dev_pw` | customer | calculating and accepting, the permission test |
 
 ## Prerequisites
 
@@ -33,3 +47,5 @@ On failure, screenshots and traces are written to `test-results/`. Open a trace 
 |---|---|---|
 | `E2E_BASE_URL` | `http://localhost:5100` | Address of the web container (it also proxies `/api/...`). |
 | `E2E_CHROMIUM_PATH` | not set | Path to a system Chromium. When set, it is started with `--no-sandbox`. |
+| `E2E_ADMIN_USER`, `E2E_ADMIN_PASSWORD` | `admin`, `admin_dev_pw` | The admin user. |
+| `E2E_CUSTOMER_USER`, `E2E_CUSTOMER_PASSWORD` | `customer`, `customer_dev_pw` | The customer user. |

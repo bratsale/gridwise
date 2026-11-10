@@ -1,3 +1,4 @@
+import { currentAccessToken, reportUnauthorized } from '../../../../shared/auth/session.ts'
 import type { components } from '../../../../shared/api/batch.ts'
 import { safeRequest, type ApiResponse } from '../../../../shared/api/client.ts'
 
@@ -60,6 +61,33 @@ export function uploadJob(file: File) {
 }
 
 // Plain links: the browser downloads the files itself.
-export const eventsUrl = (id: string) => `/api/batch/jobs/${id}/events`
+// EventSource cannot send headers, so the token goes in the URL (the gateway accepts it there for this route only, and keeps
+// it out of logs and traces).
+export const eventsUrl = (id: string, accessToken?: string | null) =>
+  `/api/batch/jobs/${id}/events${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ''}`
 export const resultsCsvUrl = (id: string) => `/api/batch/jobs/${id}/results.csv`
 export const errorsCsvUrl = (id: string) => `/api/batch/jobs/${id}/errors.csv`
+
+/**
+ * Downloads a CSV with the user's token (a plain link cannot send it) and saves it under the given name.
+ * Returns false when the download failed; a 401 starts a login like any other request.
+ */
+export async function downloadCsv(url: string, fileName: string): Promise<boolean> {
+  const token = currentAccessToken()
+  let response: Response
+  try {
+    response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  } catch {
+    return false
+  }
+  if (response.status === 401) reportUnauthorized()
+  if (!response.ok) return false
+
+  const href = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = href
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(href)
+  return true
+}

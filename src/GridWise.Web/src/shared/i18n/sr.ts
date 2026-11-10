@@ -11,6 +11,17 @@ export const sr: Dictionary = {
   'theme.dark': 'Tamna',
   'theme.system': 'Sistem',
 
+  'auth.login': 'Prijava',
+  'auth.logout': 'Odjava',
+  'auth.user': '{name} ({role})',
+  'auth.role.admin': 'administrator',
+  'auth.role.customer': 'kupac',
+  'auth.role.none': 'bez uloge',
+  'auth.signingIn': 'Prijavljivanje…',
+  'auth.required': 'Prijavite se da biste koristili GridWise.',
+  'auth.forbidden': 'Nemate dozvolu za ovo.',
+  'batch.download.failed': 'Fajl nije preuzet.',
+
   'common.loading': 'Učitavanje…',
   'common.dismiss': 'Zatvori',
   'common.cancel': 'Otkaži',

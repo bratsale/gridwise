@@ -9,9 +9,13 @@ const RETRY_MS = 3000
 // The browser reconnects by itself after a dropped connection. But when its attempt gets an HTTP error (nginx answers 502
 // while the batch service restarts) it gives up and the EventSource stays CLOSED: then a new one is opened every few seconds.
 // The stream is closed on a terminal status and when the component goes away.
+// The access token is part of the URL (EventSource cannot send headers): when it is renewed, the stream is opened again with
+// the new one, so a later reconnect never uses an expired token. The progress shown stays until the next event.
 export function useJobProgress(
   jobId: string,
-  { onProgress, onTerminal }: { onProgress?: (progress: JobProgress) => void; onTerminal?: (progress: JobProgress) => void } = {},
+  {
+    onProgress, onTerminal, accessToken,
+  }: { onProgress?: (progress: JobProgress) => void; onTerminal?: (progress: JobProgress) => void; accessToken?: string | null } = {},
 ) {
   const [progress, setProgress] = useState<JobProgress | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
@@ -22,13 +26,17 @@ export function useJobProgress(
     callbacks.current = { onProgress, onTerminal }
   })
 
+  // A finished job is not opened again when the token is renewed (only a new job id does that).
+  const finished = useRef<string | null>(null)
+
   useEffect(() => {
+    if (finished.current === jobId) return
     let source: EventSource | null = null
     let retry: ReturnType<typeof setTimeout> | undefined
     let stopped = false
 
     function connect() {
-      const current = new EventSource(eventsUrl(jobId))
+      const current = new EventSource(eventsUrl(jobId, accessToken))
       source = current
 
       current.onmessage = (event: MessageEvent<string>) => {
@@ -38,6 +46,7 @@ export function useJobProgress(
         callbacks.current.onProgress?.(next)
         if (isTerminal(next.status)) {
           stopped = true
+          finished.current = jobId
           current.close()
           callbacks.current.onTerminal?.(next)
         }
@@ -58,7 +67,7 @@ export function useJobProgress(
       clearTimeout(retry)
       source?.close()
     }
-  }, [jobId])
+  }, [jobId, accessToken])
 
   return { progress, reconnecting }
 }

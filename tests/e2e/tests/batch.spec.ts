@@ -1,12 +1,13 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { login } from './auth'
 
 const sampleFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../src/GridWise.Web/public/sample-batch.csv')
 
-// The sample file has 20 rows: 18 are valid, 2 are not (a consumption of "abc" and an unknown tax group).
+// As admin (only admins may use batch). The sample file has 20 rows: 18 are valid, 2 are not (a consumption of "abc" and an unknown tax group).
 test('the sample file is processed by a batch job: 18 rows processed, 2 failed', async ({ page }) => {
-  await page.goto('/')
+  await login(page, 'admin')
   await page.getByRole('tab', { name: 'Admin' }).click()
   await page.getByRole('tab', { name: 'Batch' }).click()
 

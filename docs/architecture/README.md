@@ -184,6 +184,12 @@ results). It reads the tax group list from the catalog, talks to batch for the b
 the recommendation service. nginx is a plain reverse proxy: it does no authentication,
 rate limiting or token checks.
 
+The app logs in with OpenID Connect (Authorization Code with PKCE, `oidc-client-ts`, client `gridwise-web`) on Keycloak's own login
+page. Tokens are kept in memory only; after a reload the session is restored silently from Keycloak's SSO session, and the access
+token (5 minutes) is renewed silently a minute before it expires. Every API call carries it as a bearer token; the batch progress
+stream, which cannot send headers, carries it as `access_token` in the URL. The Admin tab is shown only to admins and the admin pages
+show a missing-permission state to everyone else, but this is only convenience: the gateway and the services decide.
+
 ### gateway
 
 Responsibility: the single entry to the APIs. A YARP reverse proxy (ASP.NET, port 8080, host 5104 for debugging) that forwards

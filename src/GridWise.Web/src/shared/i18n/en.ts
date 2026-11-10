@@ -10,6 +10,17 @@ export const en = {
   'theme.dark': 'Dark',
   'theme.system': 'System',
 
+  'auth.login': 'Log in',
+  'auth.logout': 'Log out',
+  'auth.user': '{name} ({role})',
+  'auth.role.admin': 'administrator',
+  'auth.role.customer': 'customer',
+  'auth.role.none': 'no role',
+  'auth.signingIn': 'Signing in…',
+  'auth.required': 'Log in to use GridWise.',
+  'auth.forbidden': "You don't have permission for this.",
+  'batch.download.failed': 'The file could not be downloaded.',
+
   'common.loading': 'Loading…',
   'common.dismiss': 'Dismiss',
   'common.cancel': 'Cancel',

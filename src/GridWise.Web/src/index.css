@@ -102,7 +102,28 @@ h1, h2, h3 {
 .switchers {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+}
+
+/* Who is logged in, with the logout button. */
+.auth {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.auth-user {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* "Log in to use GridWise" and "You don't have permission for this": a message with its action, centred. */
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .segmented {

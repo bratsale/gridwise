@@ -1,9 +1,13 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useRoute } from './shared/routing/route.ts'
 import { LanguageSwitcher } from './shared/i18n/LanguageSwitcher.tsx'
 import { useT } from './shared/i18n/useLanguage.ts'
 import { ThemeSwitcher } from './shared/theme/ThemeSwitcher.tsx'
 import { Loading } from './shared/ui/Loading.tsx'
+import { useAuth } from './shared/auth/auth.ts'
+import { AuthControls } from './shared/auth/AuthControls.tsx'
+import { LoginRequired, NoPermission } from './shared/auth/AuthStates.tsx'
+import { defaultRoute, isAdmin, isCustomerOrAdmin, pageFor } from './shared/auth/roles.ts'
 
 // Each page is its own chunk, loaded when its tab is first opened.
 const AdminPage = lazy(() => import('./features/admin/AdminPage.tsx').then((m) => ({ default: m.AdminPage })))
@@ -11,7 +15,29 @@ const CustomerPage = lazy(() => import('./features/customer/CustomerPage.tsx').t
 
 export default function App() {
   const t = useT()
+  const auth = useAuth()
   const [route, navigate] = useRoute()
+  const admin = isAdmin(auth.roles)
+
+  // An address without a page opens the page that fits the role (a customer would otherwise land on the admin plans).
+  useEffect(() => {
+    if (auth.status === 'authenticated' && window.location.hash === '') navigate(defaultRoute(auth.roles))
+  }, [auth.status, auth.roles, navigate])
+
+  function content() {
+    if (auth.status === 'loading') return <Loading />
+    if (auth.status === 'anonymous') return <LoginRequired />
+    switch (pageFor(route, auth.roles)) {
+      case 'forbidden':
+        return <NoPermission />
+      case 'admin':
+        return route.tab === 'admin' && (
+          <AdminPage section={route.section} onSection={(section) => navigate({ tab: 'admin', section })} />
+        )
+      default:
+        return <CustomerPage />
+    }
+  }
 
   return (
     <div className="app">
@@ -23,19 +49,25 @@ export default function App() {
         <div className="switchers">
           <LanguageSwitcher />
           <ThemeSwitcher />
+          <AuthControls />
         </div>
       </header>
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={route.tab === 'admin'} onClick={() => navigate({ tab: 'admin', section: route.tab === 'admin' ? route.section : 'plans' })}>
-          {t('tab.admin')}
-        </button>
-        <button role="tab" aria-selected={route.tab === 'customer'} onClick={() => navigate({ tab: 'customer' })}>
-          {t('tab.customer')}
-        </button>
-      </div>
-      <Suspense fallback={<Loading />}>{route.tab === 'admin'
-          ? <AdminPage section={route.section} onSection={(section) => navigate({ tab: 'admin', section })} />
-          : <CustomerPage />}</Suspense>
+      {auth.status === 'authenticated' && (
+        <div className="tabs" role="tablist">
+          {/* Only admins see the Admin tab; the admin pages are still guarded (and the API checks the role itself). */}
+          {admin && (
+            <button role="tab" aria-selected={route.tab === 'admin'} onClick={() => navigate({ tab: 'admin', section: route.tab === 'admin' ? route.section : 'plans' })}>
+              {t('tab.admin')}
+            </button>
+          )}
+          {isCustomerOrAdmin(auth.roles) && (
+            <button role="tab" aria-selected={route.tab === 'customer'} onClick={() => navigate({ tab: 'customer' })}>
+              {t('tab.customer')}
+            </button>
+          )}
+        </div>
+      )}
+      <Suspense fallback={<Loading />}>{content()}</Suspense>
     </div>
   )
 }
