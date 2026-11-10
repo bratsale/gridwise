@@ -59,6 +59,8 @@ public sealed class GatewayFixture : IAsyncLifetime
                 ["ReverseProxy:Clusters:batch:Destinations:main:Address"] = Batch.Address,
                 ["Jwt:MetadataAddress"] = "http://unused.test/.well-known/openid-configuration", // replaced by the static configuration below
                 ["Jwt:RequireHttpsMetadata"] = "false",
+                // The real limits, except a shorter recommendations window, so "the next window" is 3 s away instead of 10.
+                ["RateLimiting:Recommendations:WindowSeconds"] = "3",
                 // As verbose as it gets by default: the categories that would print a request line stay pinned in appsettings.json.
                 ["Logging:LogLevel:Default"] = "Trace"
             }));
@@ -74,7 +76,7 @@ public sealed class GatewayFixture : IAsyncLifetime
 
     /// <summary>A token like Keycloak's, by default valid for 5 minutes; each argument breaks one thing.</summary>
     public static string Token(
-        string issuer = Issuer, string[]? audiences = null, TimeSpan? expiresIn = null, SecurityKey? key = null)
+        string issuer = Issuer, string[]? audiences = null, TimeSpan? expiresIn = null, SecurityKey? key = null, string? sub = null)
     {
         var expires = DateTime.UtcNow + (expiresIn ?? TimeSpan.FromMinutes(5));
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
@@ -86,7 +88,7 @@ public sealed class GatewayFixture : IAsyncLifetime
             Claims = new Dictionary<string, object>
             {
                 ["aud"] = audiences ?? ["gridwise-api", "account"],
-                ["sub"] = "0b6c8d1e-0000-0000-0000-000000000001",
+                ["sub"] = sub ?? "0b6c8d1e-0000-0000-0000-000000000001",
                 ["preferred_username"] = "admin",
                 ["realm_access"] = new Dictionary<string, object> { ["roles"] = new[] { "admin" } }
             },
@@ -94,11 +96,14 @@ public sealed class GatewayFixture : IAsyncLifetime
         });
     }
 
-    /// <summary>A client that sends a valid token on every request.</summary>
-    public HttpClient CreateClient()
+    /// <summary>
+    /// A client that sends a valid token on every request, by default for a user of its own, so the rate limits of one test
+    /// never count the requests of another.
+    /// </summary>
+    public HttpClient CreateClient(string? sub = null)
     {
         var client = Gateway.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token());
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(sub: sub ?? Guid.NewGuid().ToString()));
         return client;
     }
 

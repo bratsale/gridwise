@@ -18,6 +18,10 @@ It seeds 200 "Perf plan NNN" plans through the Catalog API (skipped if they exis
 then runs k6 (Docker image `grafana/k6`, host network) against `http://localhost:5102`.
 k6 exits with 99 when a threshold is crossed, and so does `run.sh`.
 
+The test calls the recommendation service directly, not through the gateway (`localhost:5100/api/...`), so the gateway's rate limit
+(20 calculations per 10 s per user) does not affect the measurement: the NFR is about the service, and 50 requests/s from one
+user would be refused by the gateway by design.
+
 ## What is measured
 
 `POST /recommendations` with `consumptionKwh` random 50-1000 and `taxGroup` household or business, with about 200 active plans
@@ -66,6 +70,8 @@ bash scripts/resilience-batch-worker.sh    # kills a worker in the middle of a j
 ```
 
 Both leave the stack with the default of 2 workers (the throughput script also when it fails).
+These scripts upload through `http://localhost:5100/api/batch`, that is through the gateway: since the gateway checks tokens and
+limits uploads to 5 per minute per user, they need a token and must stay under that limit (or call batch directly on port 5103).
 `ROWS`, `RUNS`, `WORKERS_LIST` and `TIMEOUT` can be set in the environment of the throughput script.
 
 ## Method

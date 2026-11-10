@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using GridWise.Gateway.Authentication;
+using GridWise.Gateway.RateLimiting;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.WebUtilities;
 using OpenTelemetry;
@@ -42,6 +43,7 @@ public static class TelemetryExtensions
             .AddSource("System.Net.Http"));
 
         otel.WithMetrics(metrics => metrics
+            .AddMeter(GatewayRateLimiting.MeterName)
             .AddAspNetCoreInstrumentation()
             .AddMeter("System.Net.Http")
             .AddRuntimeInstrumentation());

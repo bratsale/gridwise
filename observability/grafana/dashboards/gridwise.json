@@ -530,6 +530,70 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Gateway: requests refused by rate limits (last 5 min)",
+      "description": "429 answers of the gateway, by rate limit policy (recommendations, uploads, general). The limits count per gateway instance, in memory.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "axisSoftMax": 5,
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (policy) (increase(gridwise_gateway_rate_limited_total[5m]))",
+          "legendFormat": "{{policy}}"
+        }
+      ]
     }
   ],
   "description": "GridWise services: latency, traffic, errors, outbox, consumer lag, dead letters and batch throughput. Provisioned from observability/grafana/dashboards in the repository."

@@ -190,7 +190,20 @@ Responsibility: the single entry to the APIs. A YARP reverse proxy (ASP.NET, por
 `/api/catalog/*`, `/api/recommendation/*` and `/api/batch/*` to the three services with the prefix removed: the same paths nginx used
 before. The routes are in `src/GridWise.Gateway/appsettings.json`, the service addresses in compose (environment variables).
 Server-sent events are streamed without buffering; uploads up to 11 MB pass (batch enforces its 10 MB limit). A request's trace starts
-here, and a request without `X-Correlation-Id` gets one, which is forwarded. It owns no data and, for now, checks no tokens.
+here, and a request without `X-Correlation-Id` gets one, which is forwarded. It owns no data.
+
+It checks the bearer token of every `/api` request (Keycloak, audience `gridwise-api`) and forwards it unchanged; roles are the services'
+job. It also limits the rate per user (the token's `sub`; the client IP without a valid token), with fixed windows from configuration:
+
+| Policy | Requests | Limit |
+|---|---|---|
+| `recommendations` | `POST /api/recommendation/recommendations` | 20 per 10 s |
+| `uploads` | `POST /api/batch/jobs` | 5 per minute |
+| `general` | every other `/api` request | 100 per 10 s |
+
+A refused request gets 429 (ProblemDetails, `Retry-After` in seconds: the window length, so at most that long); refusals are counted in `gridwise.gateway.rate_limited` and shown
+on the dashboard. The counters are in memory, per gateway instance: with several instances each would count on its own (a user would
+get the limit once per instance), so they would need a shared store such as Redis.
 
 ### catalog and catalog-db
 

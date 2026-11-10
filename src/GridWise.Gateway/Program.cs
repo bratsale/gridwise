@@ -1,4 +1,5 @@
 using GridWise.Gateway.Authentication;
+using GridWise.Gateway.RateLimiting;
 using GridWise.Gateway.Telemetry;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Yarp.ReverseProxy;
@@ -6,6 +7,7 @@ using Yarp.ReverseProxy;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddGridWiseTelemetry("gateway");
 builder.AddGatewayAuthentication();
+builder.AddGatewayRateLimiting();
 
 // Routes and clusters come from the "ReverseProxy" section: appsettings.json, overridden by environment variables
 // (for example ReverseProxy__Clusters__catalog__Destinations__main__Address).
@@ -21,9 +23,12 @@ builder.Services.AddReverseProxy()
 builder.Services.AddHealthChecks().AddCheck<RoutesLoadedCheck>("routes-loaded", tags: ["ready"]);
 
 var app = builder.Build();
+app.Lifetime.ApplicationStarted.Register(GatewayRateLimiting.InitializeCounter);
 
 app.UseCorrelationId();
 app.UseAuthentication();
+// After authentication, so the user (sub) is known; before authorization, so requests with bad tokens are limited too (per IP).
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();

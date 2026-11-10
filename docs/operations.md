@@ -19,6 +19,7 @@ The dashboard is **Dashboards → GridWise → GridWise** (direct link: http://l
 | Consumer lag per group | messages the groups `recommendation`, `batch-workers` and `batch` have not read yet | 0, or falling |
 | Dead letters | messages sent to a dead-letter topic in the last 5 minutes, by source topic | 0 |
 | Batch rows per second | rows of batch jobs whose results were stored, processed and failed | moves while a job runs |
+| Gateway: requests refused by rate limits | 429 answers by policy (recommendations 20/10 s, uploads 5/min, general 100/10 s per user) | 0, or a few |
 
 The metrics are exported every 15 s, so a panel is up to about 30 s behind. The lag is sampled every 5 s by the consumer loop
 itself: while a consumer is busy retrying one message it does not update the lag, and the panel keeps the last value.
