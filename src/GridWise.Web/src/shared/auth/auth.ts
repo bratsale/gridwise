@@ -18,6 +18,8 @@ const listeners = new Set<() => void>()
 let manager: UserManager | null = null
 let redirecting = false
 let recovering: Promise<boolean> | null = null
+// While a recovery runs: the user this tab was signed in as. A user loaded for someone else is not shown, not even for a moment.
+let recoveringFor: string | undefined
 
 function setState(next: AuthState) {
   state = next
@@ -52,20 +54,27 @@ export function login() {
  * Used when the access token expired or the automatic renewal with the refresh token failed: for example after the tab slept
  * (back/forward cache, background tab), when the refresh token can be stale although the Keycloak session is still alive.
  * Only one attempt runs at a time: expiry, a failed renewal and several 401s can arrive together and share it.
- * Resolves true when signed in again; on failure (login_required, timeout) the user is removed and the login screen shows.
+ * It never switches to another user: the tabs of a browser share Keycloak's session cookie, so another tab may have logged in as
+ * someone else meanwhile. Then, as when there is no session (login_required) or no answer (timeout), the user is removed and the
+ * login screen shows. Resolves true only when signed in again as the same user.
  */
 export function recoverSession(): Promise<boolean> {
   if (redirecting) return Promise.resolve(false) // logging in or out: nothing to recover (after logout the password is asked)
   recovering ??= (async () => {
     const um = userManager()
+    const previous = (await um.getUser())?.profile.sub
+    recoveringFor = previous
     try {
-      setState(fromUser(await um.signinSilent({ forceIframeAuth: true })))
+      const user = await um.signinSilent({ forceIframeAuth: true })
+      if (previous && user?.profile.sub !== previous) throw new Error('another user is signed in to Keycloak now')
+      setState(fromUser(user))
       return state.status === 'authenticated'
     } catch {
       await um.removeUser()
       setState(anonymous)
       return false
     } finally {
+      recoveringFor = undefined
       recovering = null
     }
   })()
@@ -84,7 +93,17 @@ export function logout() {
  */
 export async function initAuth() {
   const um = userManager()
-  um.events.addUserLoaded((user) => setState(fromUser(user)))
+  um.events.addUserLoaded((user) => {
+    if (recoveringFor && user.profile.sub !== recoveringFor) return // someone else: recoverSession shows the login screen
+    setState(fromUser(user))
+  })
+  // The session monitor saw Keycloak's session end, or change to another user (a logout or login in another tab): sign out here
+  // too and show the login screen. Not during this tab's own login or logout redirect.
+  um.events.addUserSignedOut(async () => {
+    if (redirecting) return
+    await um.removeUser()
+    setState(anonymous)
+  })
   um.events.addUserUnloaded(() => setState(anonymous))
   // The login screen is shown only when the silent recovery fails, not as soon as the token expires.
   um.events.addAccessTokenExpired(() => void recoverSession())

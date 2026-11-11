@@ -17,7 +17,9 @@ export function oidcSettings(origin = window.location.origin): UserManagerSettin
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
     automaticSilentRenew: true,
     accessTokenExpiringNotificationTimeInSeconds: 60, // renew a minute before the 5-minute token expires
-    monitorSession: false,
+    // Watch Keycloak's session (its check_session_iframe, served under /auth like the rest of Keycloak, so same origin): the tabs of
+    // one browser share the session cookie, so a logout in one tab, or a login there as someone else, signs the others out too.
+    monitorSession: true,
     loadUserInfo: false,
   }
 }

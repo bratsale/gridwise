@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // oidc-client-ts replaced by a fake. By default there is no Keycloak session (silent sign-in fails); each test can change that.
 // The handlers the app registers on the events are kept, so a test can raise "token expired" or "renew failed" itself.
-const handlers = { expired: [] as (() => void)[], renewError: [] as (() => void)[] }
+const handlers = { expired: [] as (() => void)[], renewError: [] as (() => void)[], signedOut: [] as (() => void)[] }
 const signinRedirect = vi.fn(async () => {})
 const signoutRedirect = vi.fn(async () => {})
 const removeUser = vi.fn(async () => {})
 const signinSilent = vi.fn<(args?: { forceIframeAuth?: boolean }) => Promise<unknown>>()
+// The user the UserManager has stored (the one this tab is signed in as), or null.
+const getUser = vi.fn<() => Promise<unknown>>(async () => null)
 vi.mock('oidc-client-ts', () => {
   class InMemoryWebStorage {}
   class WebStorageStateStore {}
@@ -17,11 +19,13 @@ vi.mock('oidc-client-ts', () => {
       addUserUnloaded: vi.fn(),
       addAccessTokenExpired: (cb: () => void) => handlers.expired.push(cb),
       addSilentRenewError: (cb: () => void) => handlers.renewError.push(cb),
+      addUserSignedOut: (cb: () => void) => handlers.signedOut.push(cb),
     }
     signinRedirect = signinRedirect
     signoutRedirect = signoutRedirect
     signinSilent = signinSilent
     removeUser = removeUser
+    getUser = getUser
     signinRedirectCallback = vi.fn()
   }
   return { UserManager, InMemoryWebStorage, WebStorageStateStore }
@@ -30,13 +34,15 @@ vi.mock('oidc-client-ts', () => {
 const loginRequired = () => Promise.reject(new Error('login_required'))
 // A user like the one oidc-client-ts returns, with the customer role in the access token.
 const payload = btoa(JSON.stringify({ realm_access: { roles: ['customer'] } }))
-const user = { expired: false, access_token: `h.${payload}.s`, profile: { preferred_username: 'anna' } }
+const user = { expired: false, access_token: `h.${payload}.s`, profile: { sub: 'anna-id', preferred_username: 'anna' } }
+const otherUser = { ...user, access_token: `h3.${payload}.s3`, profile: { sub: 'admin2-id', preferred_username: 'admin2' } }
 
 // Each test gets a fresh auth module (its state, the guard and the redirect flag live in the module).
 async function startAnonymous() {
   vi.resetModules()
   handlers.expired = []
   handlers.renewError = []
+  handlers.signedOut = []
   signinSilent.mockImplementation(loginRequired)
   const auth = await import('./auth.ts')
   await auth.initAuth()
@@ -48,11 +54,13 @@ async function startSignedIn() {
   vi.resetModules()
   handlers.expired = []
   handlers.renewError = []
+  handlers.signedOut = []
   signinSilent.mockResolvedValueOnce(user)
   const auth = await import('./auth.ts')
   await auth.initAuth()
   expect(auth.getAuthState().status).toBe('authenticated')
   signinSilent.mockClear()
+  getUser.mockResolvedValue(user) // the tab now has anna stored
   return auth
 }
 
@@ -62,6 +70,8 @@ describe('auth', () => {
     signoutRedirect.mockClear()
     removeUser.mockClear()
     signinSilent.mockReset()
+    getUser.mockReset()
+    getUser.mockResolvedValue(null)
     window.history.replaceState(null, '', '/#admin/batch')
   })
 
@@ -111,6 +121,7 @@ describe('auth', () => {
     handlers.expired.forEach((cb) => cb())
     handlers.renewError.forEach((cb) => cb())
     const fromApi = [recoverSession(), recoverSession()]
+    await vi.waitFor(() => expect(signinSilent).toHaveBeenCalled()) // it starts after reading the stored user
     finish(user)
 
     expect(await Promise.all(fromApi)).toEqual([true, true])
@@ -130,7 +141,8 @@ describe('auth', () => {
     handlers.expired.forEach((cb) => cb())
 
     expect(getAuthState().status).toBe('authenticated')
-    expect(signinSilent).toHaveBeenCalledWith(expect.objectContaining({ forceIframeAuth: true }))
+    await vi.waitFor(() => expect(signinSilent).toHaveBeenCalledWith(expect.objectContaining({ forceIframeAuth: true })))
+    expect(getAuthState().status).toBe('authenticated') // still, while the silent sign-in runs
     finish(user)
   })
 
@@ -153,5 +165,33 @@ describe('auth', () => {
     expect(await recoverSession()).toBe(false)
     expect(signoutRedirect).toHaveBeenCalledOnce()
     expect(signinSilent).not.toHaveBeenCalled()
+  })
+
+  it('recovery never switches to another user: if Keycloak now has someone else signed in, the login screen is shown', async () => {
+    const { recoverSession, getAuthState } = await startSignedIn()
+    signinSilent.mockResolvedValueOnce(otherUser) // another tab logged out and in as admin2 (shared Keycloak session cookie)
+
+    expect(await recoverSession()).toBe(false)
+
+    expect(removeUser).toHaveBeenCalledOnce()
+    expect(getAuthState()).toEqual(expect.objectContaining({ status: 'anonymous', name: null, accessToken: null }))
+  })
+
+  it('recovery with the same user keeps the tab signed in', async () => {
+    const { recoverSession, getAuthState } = await startSignedIn()
+    signinSilent.mockResolvedValueOnce({ ...user, access_token: `h4.${payload}.s4` })
+
+    expect(await recoverSession()).toBe(true)
+    expect(getAuthState()).toEqual(expect.objectContaining({ status: 'authenticated', name: 'anna' }))
+  })
+
+  it('a sign-out in another tab (reported by the session monitor) signs this tab out too', async () => {
+    const { getAuthState } = await startSignedIn()
+
+    handlers.signedOut.forEach((cb) => cb())
+
+    await vi.waitFor(() => expect(getAuthState().status).toBe('anonymous'))
+    expect(removeUser).toHaveBeenCalledOnce()
+    expect(signinRedirect).not.toHaveBeenCalled() // the login screen, not an automatic login
   })
 })
