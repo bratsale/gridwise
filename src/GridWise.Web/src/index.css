@@ -710,6 +710,11 @@ tr.retired td {
   color: var(--muted);
 }
 
+/* "Accepted": the plan the customer accepted, after its name. */
+.badge.accepted {
+  margin-left: var(--space-3);
+}
+
 /* "Best": a short accent label after the plan name, not a filled badge. */
 .badge.best {
   margin-left: var(--space-3);
@@ -823,6 +828,11 @@ table.breakdown tr.total td:first-child::after {
 
 .result .card {
   margin-bottom: var(--space-4);
+}
+
+/* "Show all (N)" under a shortened list. */
+.list-more {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
 }
 
 /* ---------- Dialog ---------- */

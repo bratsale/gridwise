@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
@@ -13,10 +14,17 @@ function retiredFrom(versions: TaxGroup[]) {
 export function TaxGroupHistory({ taxGroup, versions }: { taxGroup: TaxGroup; versions: TaxGroup[] | null }) {
   const t = useT()
   const format = useFormat()
+  const ref = useRef<HTMLDivElement>(null)
+
+  // The row that was clicked can be far down a long list: bring the panel into view when it opens for a new item.
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [taxGroup.code])
+
   const retiredDate = versions && versions.length > 0 ? retiredFrom(versions) : null
 
   return (
-    <div className="panel">
+    <div className="panel" ref={ref}>
       <h3>{t('taxGroups.history.title', { code: taxGroup.code })}</h3>
       {versions === null ? (
         <Loading />

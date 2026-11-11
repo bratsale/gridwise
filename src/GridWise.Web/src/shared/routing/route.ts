@@ -12,6 +12,13 @@ export function parseRoute(hash: string): Route {
   return { tab: 'admin', section: 'plans' }
 }
 
+const KNOWN = ['customer', 'admin/plans', 'admin/tax-groups', 'admin/batch']
+
+// Whether the hash names a page. The app sends any other address (none, a typo, an old link) to the page that fits the role.
+export function isKnownHash(hash: string): boolean {
+  return KNOWN.includes(hash.replace(/^#\/?/, ''))
+}
+
 export function routeToHash(route: Route): string {
   if (route.tab === 'customer') return '#customer'
   if (route.section === 'taxGroups') return '#admin/tax-groups'

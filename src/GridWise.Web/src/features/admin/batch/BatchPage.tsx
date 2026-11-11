@@ -38,7 +38,10 @@ export function BatchPage() {
         />
       )}
 
-      <JobList jobs={jobs.jobs} loading={jobs.loading} selectedId={openId} onOpen={setOpenId} />
+      {/* When loading failed and nothing is known, the error above is the whole message: no "no jobs yet". */}
+      {!(jobs.error && jobs.jobs.length === 0) && (
+        <JobList jobs={jobs.jobs} loading={jobs.loading} selectedId={openId} onOpen={setOpenId} />
+      )}
     </section>
   )
 }

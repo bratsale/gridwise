@@ -43,16 +43,20 @@ export function PlansPage() {
         <RetireSection key={plans.retiring.id} plan={plans.retiring} optimistic={plans.optimistic} onDone={plans.changed} onCancel={plans.closeRetire} />
       )}
 
-      <PlanList
-        plans={plans.plans}
-        pending={plans.pending}
-        loading={plans.loading}
-        onHistory={(plan) => void plans.showHistory(plan)}
-        onEdit={(plan) => void plans.edit(plan)}
-        onRetire={plans.openRetire}
-      />
-
       {plans.history && <PlanHistory plan={plans.history.plan} versions={plans.history.versions} />}
+
+      {/* When loading failed and nothing is known, the error above is the whole message: no "no plans yet". */}
+      {!(plans.listError && plans.plans.length === 0) && (
+        <PlanList
+          plans={plans.plans}
+          pending={plans.pending}
+          loading={plans.loading}
+          selectedId={plans.history?.plan.id ?? null}
+          onHistory={(plan) => void plans.showHistory(plan)}
+          onEdit={(plan) => void plans.edit(plan)}
+          onRetire={plans.openRetire}
+        />
+      )}
     </section>
   )
 }

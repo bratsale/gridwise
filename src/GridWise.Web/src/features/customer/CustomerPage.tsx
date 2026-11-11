@@ -30,6 +30,7 @@ export function CustomerPage() {
 
       {calc.result && (
         <RecommendationResult
+          key={calc.result.id}
           result={calc.result}
           expanded={calc.expanded}
           accepting={calc.accepting}

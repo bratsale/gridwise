@@ -13,6 +13,15 @@ test('a customer sees no Admin tab, and an admin address shows the missing-permi
   await expect(page.getByRole('button', { name: 'New plan' })).toHaveCount(0)
 })
 
+test('an address that names no page takes a customer to the customer page, not to a missing-permission state', async ({ page }) => {
+  await login(page, 'customer')
+
+  await page.goto('/#nonsense')
+  await expect(page).toHaveURL(/#customer$/)
+  await expect(page.getByLabel('Consumption')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
 test('without a login the app asks to log in', async ({ page }) => {
   await page.goto('/#customer')
 

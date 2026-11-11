@@ -1,13 +1,15 @@
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { rowClass } from '../../../../shared/ui/rowClass.ts'
 import type { TaxGroup } from '../api/taxGroupsApi.ts'
 
 export function TaxGroupList({
-  taxGroups, pending, loading, onHistory, onEdit, onRetire,
+  taxGroups, pending, loading, selectedCode, onHistory, onEdit, onRetire,
 }: {
   taxGroups: TaxGroup[]
   pending: ReadonlySet<string>
   loading: boolean
+  selectedCode: string | null
   onHistory: (taxGroup: TaxGroup) => void
   onEdit: (taxGroup: TaxGroup) => void
   onRetire: (taxGroup: TaxGroup) => void
@@ -33,7 +35,7 @@ export function TaxGroupList({
             const retired = group.status === 'Retired'
             const isPending = pending.has(group.code)
             return (
-              <tr key={group.code} className={isPending ? 'pending' : retired ? 'retired' : undefined}>
+              <tr key={group.code} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', group.code === selectedCode)}>
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(group)}>{group.code}</button>
                 </td>

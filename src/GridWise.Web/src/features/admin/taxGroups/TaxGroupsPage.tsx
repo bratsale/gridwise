@@ -49,16 +49,20 @@ export function TaxGroupsPage() {
         />
       )}
 
-      <TaxGroupList
-        taxGroups={groups.taxGroups}
-        pending={groups.pending}
-        loading={groups.loading}
-        onHistory={(group) => void groups.showHistory(group)}
-        onEdit={(group) => void groups.edit(group)}
-        onRetire={groups.openRetire}
-      />
-
       {groups.history && <TaxGroupHistory taxGroup={groups.history.taxGroup} versions={groups.history.versions} />}
+
+      {/* When loading failed and nothing is known, the error above is the whole message: no "no tax groups yet". */}
+      {!(groups.listError && groups.taxGroups.length === 0) && (
+        <TaxGroupList
+          taxGroups={groups.taxGroups}
+          pending={groups.pending}
+          loading={groups.loading}
+          selectedCode={groups.history?.taxGroup.code ?? null}
+          onHistory={(group) => void groups.showHistory(group)}
+          onEdit={(group) => void groups.edit(group)}
+          onRetire={groups.openRetire}
+        />
+      )}
     </section>
   )
 }

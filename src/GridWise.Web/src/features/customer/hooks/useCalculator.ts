@@ -4,6 +4,7 @@ import { failureMessage } from '../../../shared/api/failure.ts'
 import { errorsFor } from '../../../shared/api/problems.ts'
 import { msg, raw, type Message } from '../../../shared/i18n/message.ts'
 import { acceptRecommendation, calculate as requestRecommendation, type Quote, type Recommendation, type TaxGroup } from '../api/customerApi.ts'
+import { preferredTaxGroup } from '../display.ts'
 import { validateCustomer, type CustomerField } from '../validation.ts'
 
 export const quoteKey = (quote: Quote) => `${quote.planId}:${String(quote.planVersionNo)}`
@@ -20,11 +21,11 @@ export function useCalculator(taxGroups: TaxGroup[]) {
   const [result, setResult] = useState<Recommendation | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [accepting, setAccepting] = useState<string | null>(null)
-  const [accepted, setAccepted] = useState<{ plan: string; total: number | string } | null>(null)
+  const [accepted, setAccepted] = useState<{ planId: string; plan: string; total: number | string } | null>(null)
   const [acceptError, setAcceptError] = useState<Message | null>(null)
 
-  // Until the user chooses, the first tax group is the selected one (worked out here, so no effect has to set it when the groups arrive).
-  const taxGroup = chosenTaxGroup || taxGroups[0]?.code || ''
+  // Until the user chooses, household (or the first group) is the selected one (worked out here, so no effect has to set it when the groups arrive).
+  const taxGroup = chosenTaxGroup || preferredTaxGroup(taxGroups)
 
   const clientErrors = validateCustomer({ consumption, taxGroup })
 
@@ -77,7 +78,7 @@ export function useCalculator(taxGroups: TaxGroup[]) {
 
     const response = await acceptRecommendation(result.id, quote.planId)
 
-    if (response.ok) setAccepted({ plan: quote.name, total: response.body.total })
+    if (response.ok) setAccepted({ planId: quote.planId, plan: quote.name, total: response.body.total })
     else if (response.status === 409) setAcceptError(msg('customer.alreadyAccepted'))
     else setAcceptError(failureMessage(response))
     setAccepting(null)

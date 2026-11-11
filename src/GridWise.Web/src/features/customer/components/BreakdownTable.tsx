@@ -1,5 +1,6 @@
 import { useFormat, useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Breakdown } from '../api/customerApi.ts'
+import { asDeduction } from '../display.ts'
 
 export function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
   const t = useT()
@@ -16,7 +17,7 @@ export function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
           </tr>
         ))}
         <tr className="subtotal"><td>{t('breakdown.energySubtotal')}</td><td className="num">{format.money(breakdown.energySubtotal)}</td></tr>
-        <tr><td>{t('breakdown.discount')}</td><td className="num">{format.money(breakdown.discountAmount)}</td></tr>
+        <tr><td>{t('breakdown.discount')}</td><td className="num">{format.money(asDeduction(breakdown.discountAmount))}</td></tr>
         <tr className="subtotal"><td>{t('breakdown.netEnergy')}</td><td className="num">{format.money(breakdown.netEnergy)}</td></tr>
         <tr><td>{t('breakdown.ecoTax')}</td><td className="num">{format.money(breakdown.ecoTax)}</td></tr>
         <tr className="subtotal"><td>{t('breakdown.vatBase')}</td><td className="num">{format.money(breakdown.vatBase)}</td></tr>

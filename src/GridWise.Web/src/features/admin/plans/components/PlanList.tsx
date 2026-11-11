@@ -1,13 +1,15 @@
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { rowClass } from '../../../../shared/ui/rowClass.ts'
 import type { Plan } from '../api/plansApi.ts'
 
 export function PlanList({
-  plans, pending, loading, onHistory, onEdit, onRetire,
+  plans, pending, loading, selectedId, onHistory, onEdit, onRetire,
 }: {
   plans: Plan[]
   pending: ReadonlySet<string>
   loading: boolean
+  selectedId: string | null
   onHistory: (plan: Plan) => void
   onEdit: (plan: Plan) => void
   onRetire: (plan: Plan) => void
@@ -32,7 +34,7 @@ export function PlanList({
             const retired = plan.status === 'Retired'
             const isPending = pending.has(plan.id)
             return (
-              <tr key={plan.id} className={isPending ? 'pending' : retired ? 'retired' : undefined}>
+              <tr key={plan.id} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', plan.id === selectedId)}>
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(plan)}>{plan.name}</button>
                 </td>

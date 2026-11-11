@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { useRoute } from './shared/routing/route.ts'
+import { isKnownHash, useRoute } from './shared/routing/route.ts'
 import { LanguageSwitcher } from './shared/i18n/LanguageSwitcher.tsx'
 import { useT } from './shared/i18n/useLanguage.ts'
 import { ThemeSwitcher } from './shared/theme/ThemeSwitcher.tsx'
@@ -19,14 +19,17 @@ export default function App() {
   const [route, navigate] = useRoute()
   const admin = isAdmin(auth.roles)
 
-  // An address without a page opens the page that fits the role (a customer would otherwise land on the admin plans).
+  // An address that names no page (none, a typo, an old link) opens the page that fits the role; a customer would otherwise
+  // land on the admin plans and see "no permission". `route` changes with every hash, so a new unknown hash is caught too.
+  const knownPage = isKnownHash(window.location.hash)
   useEffect(() => {
-    if (auth.status === 'authenticated' && window.location.hash === '') navigate(defaultRoute(auth.roles))
-  }, [auth.status, auth.roles, navigate])
+    if (auth.status === 'authenticated' && !knownPage) navigate(defaultRoute(auth.roles))
+  }, [auth.status, auth.roles, navigate, knownPage, route])
 
   function content() {
     if (auth.status === 'loading') return <Loading />
     if (auth.status === 'anonymous') return <LoginRequired />
+    if (!knownPage) return <Loading /> // for the moment until the effect above has moved to the default page
     switch (pageFor(route, auth.roles)) {
       case 'forbidden':
         return <NoPermission />

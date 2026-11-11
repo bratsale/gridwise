@@ -65,9 +65,16 @@ test('a new plan becomes the best offer, can be accepted, and is retired afterwa
       await expect(customer.getByRole('row', { name: new RegExp(`^${line} -?[\\d.,]+$`) })).toBeVisible()
     }
 
-    // Accept.
+    // The discount is shown as a deduction on the bill.
+    await expect(customer.getByRole('row', { name: /^Discount -[\d.,]+$/ })).toBeVisible()
+
+    // Accept: it is final, so it asks first; then the banner and the row say it was accepted.
     await planRow.getByRole('button', { name: 'Accept' }).click()
+    const confirm = customer.getByRole('dialog')
+    await expect(confirm).toContainText(`Accept ${planName} for`)
+    await confirm.getByRole('button', { name: 'Accept' }).click()
     await expect(customer.getByText(`Accepted: ${planName}`)).toBeVisible()
+    await expect(planRow.getByText('Accepted', { exact: true })).toBeVisible()
   } finally {
     await customerContext.close()
   }
