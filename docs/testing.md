@@ -4,17 +4,18 @@ This page describes how GridWise is tested today: which kinds of tests exist, wh
 cover the risky parts of the system, what is deliberately left out, and how CI uses the tests. Everything here refers to tests
 and scripts that are in the repository.
 
-Durations were measured on the development laptop (Intel i5-5300U, 4 threads, 7.6 GiB) on 2026-11-11. Some of these runs overlapped
-with other work, so treat them as upper bounds. A CI runner is usually faster.
+Counts and durations were measured on the development laptop (Intel i5-5300U, 4 threads, 7.6 GiB) on 2026-11-11, after removing
+duplicate tests and merging near-identical ones into parameterized tests. Counts are test cases, as the runners report them. Some
+of these runs overlapped with other work, so treat the durations as upper bounds. A CI runner is usually faster.
 
 ## The pyramid
 
 | Layer | Where | Count | How to run | Duration | In CI |
 |---|---|---|---|---|---|
-| Unit (.NET) | `tests/GridWise.Pricing.Tests`, `*.Catalog.Tests`, `*.Recommendation.Tests`, `*.Batch.Tests` | 75 | `dotnet test GridWise.slnx` | a few seconds | yes, job `backend` |
-| Unit (web) | `src/GridWise.Web/src/**/*.test.ts(x)` (Vitest, jsdom) | 85 | `npm test` in `src/GridWise.Web` | about 7 s | yes, job `web` |
-| Integration | `tests/GridWise.{Catalog,Recommendation,Batch,Gateway}.IntegrationTests` | 241 | `dotnet test GridWise.slnx` (needs Docker) | 17 s to 2 min 43 s per project, about 6.5 min in total | yes, job `backend` |
-| End-to-end | `tests/e2e` (Playwright, Chromium) | 4 | `npm test` in `tests/e2e`, against a running stack | about 30 s plus starting the stack | yes, job `e2e` (on `main` only) |
+| Unit (.NET) | `tests/GridWise.Pricing.Tests`, `*.Catalog.Tests`, `*.Recommendation.Tests`, `*.Batch.Tests` | 66 | `dotnet test GridWise.slnx` | a few seconds | yes, job `backend` |
+| Unit (web) | `src/GridWise.Web/src/**/*.test.ts(x)` (Vitest, jsdom) | 127 | `npm test` in `src/GridWise.Web` | about 7 s | yes, job `web` |
+| Integration | `tests/GridWise.{Catalog,Recommendation,Batch,Gateway}.IntegrationTests` | 232 | `dotnet test GridWise.slnx` (needs Docker) | 16 s to 2 min 48 s per project, about 6.5 min in total | yes, job `backend` |
+| End-to-end | `tests/e2e` (Playwright, Chromium) | 5 | `npm test` in `tests/e2e`, against a running stack | about 30 s plus starting the stack | yes, job `e2e` (on `main` only) |
 | Load | `scripts/perf/run.sh` (k6), `scripts/perf/batch-throughput.sh` | 3 scenarios, 1 throughput run | see [perf/README.md](perf/README.md) | 70 s per k6 scenario, about 8 min for the batch run | no |
 | Resilience and operations | `scripts/*.sh` | 6 scripts | `bash scripts/<name>.sh`, against a running stack | 2 s to about 6 min | only `smoke-test.sh` |
 
@@ -41,11 +42,12 @@ transactions, offsets and commits. Mocks would hide exactly that, so these tests
 The gateway tests are different: they start the gateway on real Kestrel in front of three stub services (`GatewayFixture`,
 `StubUpstream`), because what they check is routing, authentication and rate limiting, not the services behind it.
 
-**End-to-end tests** drive the real UI of the complete compose stack, including the real Keycloak login page. There are four tests:
+**End-to-end tests** drive the real UI of the complete compose stack, including the real Keycloak login page. There are five tests:
 - `main-flow.spec.ts`: an admin creates a plan, a customer in a separate browser finds it as the best offer and accepts it, and the
   admin retires it;
 - `batch.spec.ts`: the sample CSV completes with 18 processed and 2 failed rows;
-- `permissions.spec.ts`: a customer gets no Admin tab and sees the missing-permission page, and without a login the app asks to log in.
+- `permissions.spec.ts`: a customer gets no Admin tab and sees the missing-permission page, an address that names no page takes a
+  customer to the customer page, and without a login the app asks to log in.
 
 They are few on purpose. They prove that the parts are wired together (nginx, gateway, Keycloak, Kafka between catalog and
 recommendation, the batch pipeline), not the rules, which the layers below already cover. They find elements by role and label,
@@ -118,7 +120,7 @@ stopping Kafka, resetting offsets. Both kinds are described in the next sections
 | Batch prices exactly like the API | `BatchChunkProcessorTests.Totals_equal_the_recommendation_api_for_the_same_input` |
 | CSV limits (100,000 rows, 10 MB, line length, header) | `JobUploadTests`, `RoutingTests.An_upload_over_11_MB_is_refused_by_the_gateway` |
 | CSV downloads cannot inject formulas | `JobDownloadTests.Text_cells_that_look_like_formulas_get_a_leading_quote_but_numbers_do_not` |
-| Producer and consumer agree on event formats | `EventContractTests` (all four), `CatalogEventCompatibilityTests` |
+| Producer and consumer agree on event formats | `EventContractTests` (one per service), `CatalogEventCompatibilityTests` |
 | Duplicate or reordered events | `Same_message_twice_gives_one_row`, `Version_2_before_version_1_gives_both_rows`, `The_same_result_twice_changes_nothing` |
 | Concurrent writes | `Parallel_new_versions_with_same_if_match_one_wins`, `Parallel_creates_with_same_code_one_wins`, `Parallel_accepts_of_the_same_plan_create_one_acceptance`, `Parallel_requests_with_same_key_create_one_plan` |
 | A worker dies during a job | `scripts/resilience-batch-worker.sh` |

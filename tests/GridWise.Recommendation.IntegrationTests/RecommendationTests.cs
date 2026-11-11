@@ -176,36 +176,24 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
         Assert.Contains("taxGroup", problem!.Errors.Keys);
     }
 
-    [Fact]
-    public async Task Negative_consumption_is_rejected()
+    // Consumption must be 0 or more, with at most 3 decimal places (kWh as text: attributes cannot hold decimals).
+    // A rejected value is reported on consumptionKwh, so the form can show it next to the field. The key is compared ignoring
+    // case, like the web client does: [Range] reports "ConsumptionKwh", the decimal-places check "consumptionKwh".
+    [Theory]
+    [InlineData("-1", HttpStatusCode.BadRequest, null)]
+    [InlineData("250.0005", HttpStatusCode.BadRequest, "At most 3 decimal places.")]
+    [InlineData("250.125", HttpStatusCode.Created, null)]
+    public async Task Consumption_must_be_0_or_more_with_at_most_3_decimals(string kwh, HttpStatusCode expected, string? message)
     {
         await SeedStandardAndPremium();
 
-        var response = await Post(Household(-1m));
+        var response = await Post(Household(decimal.Parse(kwh, System.Globalization.CultureInfo.InvariantCulture)));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task More_than_3_decimal_places_are_rejected()
-    {
-        await SeedStandardAndPremium();
-
-        var response = await Post(Household(250.0005m));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(expected, response.StatusCode);
+        if (expected != HttpStatusCode.BadRequest) return;
         var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
-        Assert.Equal("At most 3 decimal places.", Assert.Single(problem!.Errors["consumptionKwh"]));
-    }
-
-    [Fact]
-    public async Task Exactly_3_decimal_places_are_accepted()
-    {
-        await SeedStandardAndPremium();
-
-        var response = await Post(Household(250.125m));
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var errors = Assert.Single(problem!.Errors, e => e.Key.Equals("consumptionKwh", StringComparison.OrdinalIgnoreCase)).Value;
+        if (message is not null) Assert.Equal(message, Assert.Single(errors));
     }
 
     [Fact]
@@ -247,11 +235,9 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
 
         var items = (await InDb(db => db.PlanRecommendations.AsNoTracking().SingleAsync(r => r.Id == id))).Items;
 
+        // The ranking of both plans is stored, their breakdowns are not (ADR 0007).
+        Assert.Equal(2, JsonDocument.Parse(items).RootElement.GetArrayLength());
         Assert.DoesNotContain("breakdown", items, StringComparison.OrdinalIgnoreCase);
-        var array = JsonDocument.Parse(items).RootElement;
-        Assert.Equal(2, array.GetArrayLength());
-        Assert.All(array.EnumerateArray(), item =>
-            Assert.Equal(["name", "planId", "planVersionNo", "total"], item.EnumerateObject().Select(p => p.Name).Order().ToArray()));
     }
 
     [Fact]

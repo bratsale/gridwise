@@ -6,7 +6,7 @@ using GridWise.Recommendation.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace GridWise.Recommendation.IntegrationTests;
 
@@ -46,12 +46,18 @@ public class BatchWorkerTests(RecommendationFactory factory, KafkaFixture kafka)
 
         var config = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["Kafka:BootstrapServers"] = kafka.BootstrapServers }).Build();
-        var worker = new BatchWorker(
-            factory.Services.GetRequiredService<IServiceScopeFactory>(), config, TimeProvider.System, NullLogger<BatchWorker>.Instance);
+        var log = new RecordingLogger<BatchWorker>();
+        var worker = new BatchWorker(factory.Services.GetRequiredService<IServiceScopeFactory>(), config, TimeProvider.System, log);
         await worker.StartAsync(CancellationToken.None);
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            // The worker has read the chunk once it reports that it will retry it (no plans yet): only then does "nothing written" mean something.
+            var readBy = DateTime.UtcNow + Timeout;
+            while (!log.Messages.Any(m => m.Contains(Topics.BatchChunks) && m.Contains("retrying")))
+            {
+                Assert.True(DateTime.UtcNow < readBy, "The worker did not read the chunk.");
+                await Task.Delay(100);
+            }
             Assert.Equal((0, 0), await Counts(jobId));
 
             using (var scope = factory.Services.CreateScope())
@@ -112,4 +118,16 @@ public class BatchWorkerTests(RecommendationFactory factory, KafkaFixture kafka)
         Assert.Equal(EventTypes.BatchChunkCompleted, envelope.Type);
         Assert.Equal(1, envelope.Data.GetProperty("results").GetArrayLength());
     }
+}
+
+/// <summary>Keeps every message the worker logs, so a test can wait for a step instead of sleeping.</summary>
+internal sealed class RecordingLogger<T> : ILogger<T>
+{
+    public System.Collections.Concurrent.ConcurrentQueue<string> Messages { get; } = new();
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        => Messages.Enqueue(formatter(state, exception));
 }

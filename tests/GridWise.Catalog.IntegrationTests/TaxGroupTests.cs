@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Http;
 using GridWise.Catalog.Api;
 using GridWise.Catalog.Data;
 using GridWise.Catalog.Domain;
@@ -84,13 +85,20 @@ public class TaxGroupTests(CatalogFactory factory)
         Assert.Equal(1, await OutboxCount(code));
     }
 
-    [Fact]
-    public async Task Invalid_code_is_rejected()
-        => Assert.Equal(HttpStatusCode.BadRequest, (await Create("Household")).StatusCode);
+    // A code must be lower case (letters, digits, dashes) and VAT a fraction from 0 to 1; the error names the field.
+    // The key is compared ignoring case, like the web client does (data annotations report "Code" and "Vat").
+    [Theory]
+    [InlineData("an upper-case code", "Household", "0.17", "code")]
+    [InlineData("VAT above 100 %", null, "1.5", "vat")]
+    public async Task Invalid_tax_group_input_is_rejected_on_its_field(string input, string? code, string vat, string errorOn)
+    {
+        var response = await Create(code ?? NewCode(), decimal.Parse(vat, System.Globalization.CultureInfo.InvariantCulture));
 
-    [Fact]
-    public async Task Vat_above_one_is_rejected()
-        => Assert.Equal(HttpStatusCode.BadRequest, (await Create(NewCode(), vat: 1.5m)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
+        Assert.True(problem!.Errors.Keys.Any(k => k.Equals(errorOn, StringComparison.OrdinalIgnoreCase)),
+            $"{input}: expected an error on '{errorOn}', got: {string.Join(", ", problem.Errors.Keys)}");
+    }
 
     [Fact]
     public async Task New_version_is_created()

@@ -116,10 +116,15 @@ public class AuthenticationTests(GatewayFixture gateway)
             gateway.Batch.ReleaseStream();
             await response.Content.ReadAsStringAsync();
         }
-        await Task.Delay(500); // let the server span end
-
-        var serverSpan = gateway.Spans.Last(s => s.Kind == System.Diagnostics.ActivityKind.Server
-            && (s.GetTagItem("url.path") as string) == $"/api/batch/jobs/{jobId}/events");
+        // The server span ends just after the response: wait until it is recorded instead of pausing for a fixed time.
+        System.Diagnostics.Activity? serverSpan;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while ((serverSpan = gateway.Spans.LastOrDefault(s => s.Kind == System.Diagnostics.ActivityKind.Server
+                   && (s.GetTagItem("url.path") as string) == $"/api/batch/jobs/{jobId}/events")) is null)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The server span of the events request was not recorded.");
+            await Task.Delay(50);
+        }
         Assert.Equal("?access_token=REDACTED", serverSpan.GetTagItem("url.query"));
 
         Assert.DoesNotContain(gateway.Logs, line => line.Contains(token));
