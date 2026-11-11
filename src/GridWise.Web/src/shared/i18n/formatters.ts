@@ -10,6 +10,7 @@ export function createFormatters(language: Language) {
   const money = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const quantity = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 })
   const price = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+  const rate = new Intl.NumberFormat(locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
   const percent = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })
   const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' })
@@ -20,6 +21,8 @@ export function createFormatters(language: Language) {
     money: (value: Value) => money.format(Number(value)),
     kwh: (value: Value) => `${quantity.format(Number(value))} kWh`,
     price: (value: Value) => price.format(Number(value)),
+    // A rate per kWh (eco tax), always with its 4 decimals (the API allows 4), so the rates in a column line up.
+    rate: (value: Value) => rate.format(Number(value)),
     // The API uses a fraction (0.05), the screens show a percentage.
     percent: (fraction: Value) => `${percent.format(Number((Number(fraction) * 100).toFixed(2)))} %`,
     // Plan dates are calendar dates (YYYY-MM-DD), shown as the same day in UTC.

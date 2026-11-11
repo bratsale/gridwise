@@ -47,7 +47,7 @@ export function TaxGroupList({
                 </td>
                 <td className="mono">{format.date(group.effectiveFrom)}</td>
                 <td className="num">{format.percent(group.vat)}</td>
-                <td className="num">{format.price(group.ecoTax)}</td>
+                <td className="num">{format.rate(group.ecoTax)}</td>
                 <td>
                   {!retired && !isPending && (
                     <div className="actions">

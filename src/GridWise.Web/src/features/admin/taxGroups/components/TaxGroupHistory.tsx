@@ -52,7 +52,7 @@ export function TaxGroupHistory({ taxGroup, versions }: { taxGroup: TaxGroup; ve
                     </td>
                     <td className="mono">{format.date(v.effectiveFrom)}</td>
                     <td className="num">{format.percent(v.vat)}</td>
-                    <td className="num">{format.price(v.ecoTax)}</td>
+                    <td className="num">{format.rate(v.ecoTax)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -436,6 +436,7 @@ input[type='date'] {
 
 input::placeholder {
   color: var(--muted);
+  font-family: var(--font);
 }
 
 input:disabled {
@@ -659,6 +660,25 @@ table.plans tr:not(.best) button.primary:hover:not(:disabled) {
   border-color: var(--rule);
 }
 
+/* A disabled primary action is outlined and muted, in both themes: a faded accent fill looks broken, not disabled.
+   The second selector is as specific as the table rule above, so it applies in the tables too. */
+button.primary:disabled,
+table.plans tr button.primary:disabled {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* In tables, actions stay side by side and names on one line; a narrow window scrolls the table instead. */
+td .actions {
+  flex-wrap: nowrap;
+}
+
+td button.link {
+  white-space: nowrap;
+}
+
 tr.details,
 tr.details:hover {
   background: var(--surface) !important;
@@ -858,6 +878,20 @@ dialog.confirm .actions {
 
 dialog.confirm::backdrop {
   background: var(--backdrop);
+}
+
+/* Columns that are not needed on a narrow screen (for example when a batch job was created). */
+@media (max-width: 900px) {
+  .wide-only {
+    display: none;
+  }
+
+  /* Tighter cells, so the admin tables fit without wrapping their names and actions. */
+  th,
+  td {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
 }
 
 @media (max-width: 600px) {

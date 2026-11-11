@@ -19,7 +19,7 @@ export function JobList({
         <thead>
           <tr>
             <th>{t('batch.col.file')}</th><th>{t('batch.col.status')}</th><th>{t('batch.col.progress')}</th>
-            <th>{t('batch.col.rows')}</th><th>{t('batch.col.created')}</th>
+            <th>{t('batch.col.rows')}</th><th className="wide-only">{t('batch.col.created')}</th>
           </tr>
         </thead>
         <tbody>
@@ -32,7 +32,7 @@ export function JobList({
                 <span className="hint">{t('batch.chunks', { done: job.completedChunks, total: job.totalChunks })}</span>
               </td>
               <td className="mono">{t('batch.rows', { processed: format.integer(job.processedRows), failed: format.integer(job.failedRows) })}</td>
-              <td className="mono">{format.dateTime(job.createdAt)}</td>
+              <td className="mono wide-only">{format.dateTime(job.createdAt)}</td>
             </tr>
           ))}
         </tbody>
