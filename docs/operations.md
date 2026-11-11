@@ -99,6 +99,37 @@ Symptoms: a plan changed in the admin does not appear in recommendations, or a b
 5. **Dead-letter topics and reprocessing.** If messages were dead-lettered, read them, fix the cause and run `reprocess-dlq`
    (see "Dead letters"). A batch job whose chunk was dead-lettered completes once the chunk is reprocessed.
 
+## Rebuilding Recommendation's catalog copy from Kafka
+
+Recommendation keeps its own copy of the catalog (`plan_versions`, `tax_group_versions` in recommendation-db), filled only from the
+topics `catalog.plan-events` and `catalog.tax-group-events` (consumer group `recommendation`). Both topics keep every event
+(`retention.ms=-1`, `retention.bytes=-1`, no compaction), so the copy can always be rebuilt from them.
+
+**When to use it.** The copy is wrong or incomplete and the topics are fine: rows were deleted or edited by hand, recommendation-db
+was restored from an old backup, or a bug in the consumer stored wrong data and has been fixed. Also to show that the topics alone
+are enough (assignment module 02).
+
+**How.** `bash scripts/replay-recommendation-db.sh` (`TIMEOUT`, default 60 s, is how long it waits for the rebuild). It:
+1. waits until Catalog's outbox is empty, then reads the expected state from catalog-db (plans, versions, the highest version per
+   plan and per tax group);
+2. stops `recommendation` and the `recommendation-worker` containers. The workers use another group (`batch-workers`) but price batch
+   rows from the same copy, so they must not run while it is empty;
+3. truncates `plan_versions` and `tax_group_versions`. There is no separate processed-events table for these events: the primary
+   keys with `ON CONFLICT DO NOTHING` are the dedup. `recommendations`, `acceptances`, `processed_chunks` and the outbox are
+   Recommendation's own data and are not touched;
+4. resets the group `recommendation` to the earliest offset on both topics (`kafka-consumer-groups.sh` in the kafka container, as
+   `kafka-admin`);
+5. starts the service, waits until the copy matches the Catalog, starts the workers and prints PASS or FAIL (exit code 1).
+
+Measured on 2026-11-11 (202 plans, 2 tax groups): rebuilt in about 10 s after the container started, 21 s for the whole script.
+
+**Things to know.**
+- Recommendations are unavailable for those seconds (calculations through the gateway fail until the service is back). Do not run it while a batch job is running:
+  its chunks would wait, and a chunk that is in flight when the workers stop is delivered again (harmless, but slower).
+- A FAIL usually means some events end up in `recommendation.dlq` again during the replay: see "Dead letters" above.
+- The script stops and starts the containers with `docker stop`/`docker start`, not `docker compose start`: the latter also
+  starts the dependencies and would re-run the one-shot `kafka-init` first, which takes about a minute.
+
 ## When there are emails
 
 Once a notification service sends emails (for example "your plan was accepted"), "the email is late" is the same question one
