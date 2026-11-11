@@ -49,13 +49,31 @@ public class JobUploadTests(BatchFactory factory)
         Assert.Equal(JsonValueKind.Null, job.GetProperty("startedAt").ValueKind);
     }
 
-    [Fact]
-    public async Task Missing_file_is_rejected()
+    // Every rule an upload can break is answered with 400 and a title that names the reason (the web app translates these).
+    [Theory]
+    [InlineData("no file field", null, "missing")]
+    [InlineData("an empty file", null, "empty")]
+    [InlineData("only the header", null, "no data rows")]
+    [InlineData("a header with a column missing", "customer_id,consumption_kwh", "header")]
+    [InlineData("a header in another order", "customer_id,tax_group,consumption_kwh", "header")]
+    [InlineData("a header with another column name", "id,consumption_kwh,tax_group", "header")]
+    [InlineData("a header with an extra column", "customer_id,consumption_kwh,tax_group,extra", "header")]
+    [InlineData("more than 100,000 rows", null, "100000")]
+    public async Task An_upload_that_breaks_a_rule_is_rejected_with_the_reason(string upload, string? header, string reason)
     {
-        var response = await Upload(Form((byte[]?)null));
+        var content = upload switch
+        {
+            "no file field" => Form((byte[]?)null),
+            "an empty file" => Form([]),
+            "only the header" => Form(Csv(0)),
+            "more than 100,000 rows" => Form(Csv(100_001)),
+            _ => Form(Csv(2, header!)),
+        };
+
+        var response = await Upload(content);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("missing", await ProblemTitle(response));
+        Assert.Contains(reason, await ProblemTitle(response));
     }
 
     [Fact]
@@ -64,37 +82,6 @@ public class JobUploadTests(BatchFactory factory)
         var response = await Upload(new StringContent(Csv(1), Encoding.UTF8, "text/csv"));
 
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Empty_file_is_rejected()
-    {
-        var response = await Upload(Form([]));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("empty", await ProblemTitle(response));
-    }
-
-    [Fact]
-    public async Task Header_only_is_rejected()
-    {
-        var response = await Upload(Form(Csv(0)));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("no data rows", await ProblemTitle(response));
-    }
-
-    [Theory]
-    [InlineData("customer_id,consumption_kwh")]
-    [InlineData("customer_id,tax_group,consumption_kwh")]
-    [InlineData("id,consumption_kwh,tax_group")]
-    [InlineData("customer_id,consumption_kwh,tax_group,extra")]
-    public async Task Wrong_header_is_rejected(string header)
-    {
-        var response = await Upload(Form(Csv(2, header)));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("header", await ProblemTitle(response));
     }
 
     [Fact]
@@ -135,15 +122,6 @@ public class JobUploadTests(BatchFactory factory)
     }
 
     [Fact]
-    public async Task More_than_100000_rows_are_rejected()
-    {
-        var response = await Upload(Form(Csv(100_001)));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("100000", await ProblemTitle(response));
-    }
-
-    [Fact]
     public async Task Body_over_10_MB_is_rejected_with_413()
     {
         var response = await Upload(Form(new byte[10 * 1024 * 1024 + 1]));
@@ -151,10 +129,16 @@ public class JobUploadTests(BatchFactory factory)
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Unknown_job_returns_404()
+    // Every endpoint of a job answers 404 for an id that does not exist (not 500, not an empty stream or file).
+    [Theory]
+    [InlineData("GET", "")]
+    [InlineData("GET", "/events")]
+    [InlineData("GET", "/results.csv")]
+    [InlineData("GET", "/errors.csv")]
+    [InlineData("POST", "/cancel")]
+    public async Task An_unknown_job_is_404_on_every_job_endpoint(string method, string path)
     {
-        var response = await factory.CreateClient().GetAsync($"/jobs/{Guid.NewGuid()}");
+        var response = await factory.CreateClient().SendAsync(new HttpRequestMessage(new HttpMethod(method), $"/jobs/{Guid.NewGuid()}{path}"));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

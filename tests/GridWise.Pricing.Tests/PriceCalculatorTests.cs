@@ -37,10 +37,16 @@ public class PriceCalculatorTests
         Assert.Equal(25.92m, b.Total);
     }
 
-    [Fact] public void Premium_250_business_total() => AssertTotal(Premium, Business, 250m, 26.22m);
-    [Fact] public void Standard_250_business_total() => AssertTotal(Standard, Business, 250m, 28.08m);
-    [Fact] public void Standard_600_household_total() => AssertTotal(Standard, Household, 600m, 54.64m);
-    [Fact] public void Premium_600_household_total() => AssertTotal(Premium, Household, 600m, 47.74m);
+    // Totals for the other combinations of plan, tax group and consumption (amounts as strings: attributes cannot hold decimals).
+    [Theory]
+    [InlineData("Premium", "business", 250, "26.22")]
+    [InlineData("Standard", "business", 250, "28.08")]
+    [InlineData("Standard", "household", 600, "54.64")]
+    [InlineData("Premium", "household", 600, "47.74")]
+    public void Total(string plan, string taxGroup, int kwh, string expected)
+        => Assert.Equal(
+            decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture),
+            PriceCalculator.Calculate(plan == "Premium" ? Premium : Standard, taxGroup == "business" ? Business : Household, kwh).Total);
 
     [Fact]
     public void Vat_on_exact_midpoint_rounds_up()
@@ -52,7 +58,4 @@ public class PriceCalculatorTests
         Assert.Equal(3.49m, b.VatAmount);
         Assert.Equal(23.99m, b.Total);
     }
-
-    private static void AssertTotal(PricingPlan plan, TaxGroup group, decimal kwh, decimal expected)
-        => Assert.Equal(expected, PriceCalculator.Calculate(plan, group, kwh).Total);
 }

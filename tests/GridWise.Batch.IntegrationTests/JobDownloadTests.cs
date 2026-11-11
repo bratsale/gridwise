@@ -132,10 +132,4 @@ public class JobDownloadTests(BatchFactory factory)
             foreach (var file in new[] { "results.csv", "errors.csv" })
                 Assert.Equal(HttpStatusCode.Conflict, (await Get(jobId, file)).StatusCode);
     }
-
-    [Theory]
-    [InlineData("results.csv")]
-    [InlineData("errors.csv")]
-    public async Task Unknown_job_is_404(string file)
-        => Assert.Equal(HttpStatusCode.NotFound, (await Get(Guid.NewGuid(), file)).StatusCode);
 }

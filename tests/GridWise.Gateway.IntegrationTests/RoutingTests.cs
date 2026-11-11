@@ -21,25 +21,18 @@ public class RoutingTests(GatewayFixture gateway)
         Assert.Equal(upstreamPath, echo.Path);
     }
 
+    // Our route transforms only remove the prefix: the method, the query string and the body arrive as they were sent.
     [Fact]
-    public async Task Query_string_passes_through()
-    {
-        var echo = await gateway.CreateClient().GetFromJsonAsync<Echo>("/api/catalog/tax-groups?includeRetired=true&x=a%20b");
-
-        Assert.Equal("/tax-groups", echo!.Path);
-        Assert.Equal("?includeRetired=true&x=a%20b", echo.Query);
-    }
-
-    [Fact]
-    public async Task Request_body_passes_through()
+    public async Task Method_query_string_and_body_reach_the_service_unchanged()
     {
         const string json = """{"consumptionKwh":250,"taxGroup":"household"}""";
 
-        var response = await gateway.CreateClient().PostAsync("/api/recommendation/recommendations",
+        var response = await gateway.CreateClient().PostAsync("/api/recommendation/recommendations?dryRun=true&x=a%20b",
             new StringContent(json, Encoding.UTF8, "application/json"));
         var echo = await response.Content.ReadFromJsonAsync<Echo>();
 
-        Assert.Equal(("recommendation", "POST", "/recommendations", json), (echo!.Upstream, echo.Method, echo.Path, echo.Body));
+        Assert.Equal(("recommendation", "POST", "/recommendations", "?dryRun=true&x=a%20b", json),
+            (echo!.Upstream, echo.Method, echo.Path, echo.Query, echo.Body));
     }
 
     [Fact]

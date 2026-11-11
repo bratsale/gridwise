@@ -148,12 +148,4 @@ public class JobEventsTests(BatchFactory factory)
 
         Assert.Null(await events.NextEventAsync(cts.Token)); // closed by the server, not by the client
     }
-
-    [Fact]
-    public async Task Unknown_job_is_404()
-    {
-        var response = await factory.CreateClient().GetAsync($"/jobs/{Guid.NewGuid()}/events");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
 }

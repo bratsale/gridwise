@@ -24,45 +24,28 @@ public class CatalogRulesTests
     public void Valid_plan_has_no_errors()
         => Assert.Empty(CatalogRules.ValidatePlan(Standard, Today, null));
 
-    [Fact]
-    public void Empty_tiers()
-        => AssertSingleError(CatalogRules.ValidateTiers([]), "tiers");
+    // Each broken tier list gives exactly one error, on the field the form shows it next to.
+    private static readonly Dictionary<string, TierDraft[]> InvalidTiers = new()
+    {
+        ["no tiers"] = [],
+        ["the last tier has a limit"] = [new(100m, 0.10m), new(300m, 0.08m)],
+        ["a tier without a limit that is not the last"] = [new(100m, 0.10m), new(null, 0.08m), new(null, 0.06m)],
+        ["two tiers with the same limit"] = [new(100m, 0.10m), new(100m, 0.08m), new(null, 0.06m)],
+        ["limits going down"] = [new(300m, 0.10m), new(100m, 0.08m), new(null, 0.06m)],
+        ["a limit of 0"] = [new(0m, 0.10m), new(300m, 0.08m), new(null, 0.06m)],
+        ["a negative price"] = [new(100m, -0.10m), new(null, 0.06m)],
+    };
 
-    [Fact]
-    public void Last_tier_with_threshold()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(100m, 0.10m), new(300m, 0.08m)]),
-            "tiers[1].threshold");
-
-    [Fact]
-    public void Null_threshold_not_last()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(100m, 0.10m), new(null, 0.08m), new(null, 0.06m)]),
-            "tiers[1].threshold");
-
-    [Fact]
-    public void Equal_thresholds()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(100m, 0.10m), new(100m, 0.08m), new(null, 0.06m)]),
-            "tiers[1].threshold");
-
-    [Fact]
-    public void Descending_thresholds()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(300m, 0.10m), new(100m, 0.08m), new(null, 0.06m)]),
-            "tiers[1].threshold");
-
-    [Fact]
-    public void Threshold_zero()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(0m, 0.10m), new(300m, 0.08m), new(null, 0.06m)]),
-            "tiers[0].threshold");
-
-    [Fact]
-    public void Negative_price()
-        => AssertSingleError(
-            CatalogRules.ValidateTiers([new(100m, -0.10m), new(null, 0.06m)]),
-            "tiers[0].pricePerKwh");
+    [Theory]
+    [InlineData("no tiers", "tiers")]
+    [InlineData("the last tier has a limit", "tiers[1].threshold")]
+    [InlineData("a tier without a limit that is not the last", "tiers[1].threshold")]
+    [InlineData("two tiers with the same limit", "tiers[1].threshold")]
+    [InlineData("limits going down", "tiers[1].threshold")]
+    [InlineData("a limit of 0", "tiers[0].threshold")]
+    [InlineData("a negative price", "tiers[0].pricePerKwh")]
+    public void Invalid_tiers(string tiers, string errorOn)
+        => AssertSingleError(CatalogRules.ValidateTiers(InvalidTiers[tiers]), errorOn);
 
     [Fact]
     public void Effective_from_yesterday()

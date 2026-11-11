@@ -127,8 +127,4 @@ public class CancelTests(BatchFactory factory)
 
         Assert.Equal(HttpStatusCode.Conflict, (await Cancel(jobId)).StatusCode);
     }
-
-    [Fact]
-    public async Task Cancelling_an_unknown_job_is_404()
-        => Assert.Equal(HttpStatusCode.NotFound, (await Cancel(Guid.NewGuid())).StatusCode);
 }
