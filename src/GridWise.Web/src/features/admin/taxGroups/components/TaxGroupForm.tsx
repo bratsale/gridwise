@@ -1,8 +1,9 @@
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../../shared/i18n/message.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { FieldErrors } from '../../../../shared/ui/FieldErrors.tsx'
+import { reveal } from '../../../../shared/ui/reveal.ts'
 import type { TaxGroup } from '../api/taxGroupsApi.ts'
 
 export interface TaxGroupFormProps {
@@ -29,9 +30,13 @@ export interface TaxGroupFormProps {
 export function TaxGroupForm(p: TaxGroupFormProps) {
   const t = useT()
   const text = useMessageText()
+  const ref = useRef<HTMLFormElement>(null)
+
+  // Opened at the top of the page, maybe far from the row that was clicked: bring it into view, with the cursor in its first field.
+  useEffect(() => reveal(ref.current, { focus: true }), [])
 
   return (
-    <form className="panel tax-group-form" onSubmit={p.onSubmit} noValidate>
+    <form ref={ref} className="panel tax-group-form" onSubmit={p.onSubmit} noValidate>
       <h3>{p.editing ? t('taxGroupForm.titleVersion', { code: p.editing.code }) : t('taxGroupForm.titleNew')}</h3>
 
       {!p.editing && (

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { reveal } from '../../../../shared/ui/reveal.ts'
 import type { TaxGroup } from '../api/taxGroupsApi.ts'
 
 // The latest version (highest number) tells whether the tax group is retired, and from when.
@@ -18,7 +19,7 @@ export function TaxGroupHistory({ taxGroup, versions }: { taxGroup: TaxGroup; ve
 
   // The row that was clicked can be far down a long list: bring the panel into view when it opens for a new item.
   useEffect(() => {
-    ref.current?.scrollIntoView?.({ block: 'nearest' })
+    reveal(ref.current, { block: 'nearest' })
   }, [taxGroup.code])
 
   const retiredDate = versions && versions.length > 0 ? retiredFrom(versions) : null

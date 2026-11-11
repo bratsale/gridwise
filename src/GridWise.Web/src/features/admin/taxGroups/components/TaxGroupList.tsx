@@ -1,28 +1,33 @@
 import { taxGroupLabel } from '../../../../shared/i18n/taxGroupName.ts'
+import { useRef } from 'react'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { useRevealRow } from '../../../../shared/ui/reveal.ts'
 import { rowClass } from '../../../../shared/ui/rowClass.ts'
 import type { TaxGroup } from '../api/taxGroupsApi.ts'
 
 export function TaxGroupList({
-  taxGroups, pending, loading, selectedCode, onHistory, onEdit, onRetire,
+  taxGroups, pending, loading, selectedCode, flashCode, onHistory, onEdit, onRetire,
 }: {
   taxGroups: TaxGroup[]
   pending: ReadonlySet<string>
   loading: boolean
   selectedCode: string | null
+  flashCode: string | null
   onHistory: (taxGroup: TaxGroup) => void
   onEdit: (taxGroup: TaxGroup) => void
   onRetire: (taxGroup: TaxGroup) => void
 }) {
   const t = useT()
   const format = useFormat()
+  const list = useRef<HTMLDivElement>(null)
+  useRevealRow(list, flashCode, taxGroups)
 
   if (loading) return <div className="card"><Loading /></div>
   if (taxGroups.length === 0) return <div className="card"><p className="state">{t('taxGroups.empty')}</p></div>
 
   return (
-    <div className="card flush table-wrap">
+    <div className="card flush table-wrap" ref={list}>
       <table className="plans">
         <thead>
           <tr>
@@ -36,7 +41,7 @@ export function TaxGroupList({
             const retired = group.status === 'Retired'
             const isPending = pending.has(group.code)
             return (
-              <tr key={group.code} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', group.code === selectedCode)}>
+              <tr key={group.code} data-key={group.code} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', group.code === selectedCode, group.code === flashCode)}>
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(group)}>{taxGroupLabel(t, group.code)}</button>
                 </td>

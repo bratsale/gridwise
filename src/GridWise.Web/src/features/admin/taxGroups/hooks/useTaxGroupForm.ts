@@ -84,7 +84,7 @@ export function useTaxGroupForm(
     else change.rollback()
 
     if (response.ok) {
-      onSaved(editing ? { kind: 'versionSaved', version: String(response.body.versionNo) } : { kind: 'created' })
+      onSaved(editing ? { kind: 'versionSaved', version: String(response.body.versionNo) } : { kind: 'created', code: response.body.code })
     } else if (response.status === 409) {
       if (editing) setConflict(true)
       else setCodeExists(true)

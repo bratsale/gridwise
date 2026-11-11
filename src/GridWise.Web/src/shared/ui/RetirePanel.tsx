@@ -1,9 +1,10 @@
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { useFormat, useMessageText, useT } from '../i18n/useLanguage.ts'
 import type { Message } from '../i18n/message.ts'
 import { Banner } from './Banner.tsx'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { FieldErrors } from './FieldErrors.tsx'
+import { reveal } from './reveal.ts'
 
 export function RetirePanel({
   name, effectiveFrom, submitting, confirming, message, general, dateErrors,
@@ -25,9 +26,13 @@ export function RetirePanel({
   const t = useT()
   const text = useMessageText()
   const format = useFormat()
+  const ref = useRef<HTMLFormElement>(null)
+
+  // Opened at the top of the page, maybe far from the row that was clicked: bring it into view, with the cursor in its first field.
+  useEffect(() => reveal(ref.current, { focus: true }), [])
 
   return (
-    <form className="panel" onSubmit={onAsk}>
+    <form ref={ref} className="panel" onSubmit={onAsk}>
       <h3>{t('retire.title', { name })}</h3>
       <label>
         {t('retire.from')}

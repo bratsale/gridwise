@@ -57,6 +57,7 @@ export function TaxGroupsPage() {
           pending={groups.pending}
           loading={groups.loading}
           selectedCode={groups.history?.taxGroup.code ?? null}
+          flashCode={groups.flash}
           onHistory={(group) => void groups.showHistory(group)}
           onEdit={(group) => void groups.edit(group)}
           onRetire={groups.openRetire}

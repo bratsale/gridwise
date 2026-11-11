@@ -1056,6 +1056,24 @@ a.button:hover {
 }
 
 /* The opened job: a neutral tint with an ink rule (the accent is kept for the best plan). */
+/* A row that was just edited, retired or created: an accent tint that fades out (static, without the fade, for less motion). */
+@keyframes row-flash {
+  0%, 60% { background: var(--accent-soft); }
+  100% { background: transparent; }
+}
+
+/* Held, then faded: the row may only scroll into view after a long smooth scroll (about 1.5 s). As long as FLASH_MS in the hooks. */
+table.plans tr.flash td {
+  animation: row-flash 3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  table.plans tr.flash td {
+    animation: none;
+    background: var(--accent-soft);
+  }
+}
+
 table.plans tr.selected,
 table.plans tr.selected:hover {
   background: var(--surface-2);

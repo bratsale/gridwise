@@ -1,8 +1,9 @@
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../../shared/i18n/message.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { FieldErrors } from '../../../../shared/ui/FieldErrors.tsx'
+import { reveal } from '../../../../shared/ui/reveal.ts'
 import type { Plan } from '../api/plansApi.ts'
 import type { TierRow } from '../validation.ts'
 import { TiersEditor } from './TiersEditor.tsx'
@@ -31,9 +32,13 @@ export interface PlanFormProps {
 export function PlanForm(p: PlanFormProps) {
   const t = useT()
   const text = useMessageText()
+  const ref = useRef<HTMLFormElement>(null)
+
+  // Opened at the top of the page, maybe far from the row that was clicked: bring it into view, with the cursor in its first field.
+  useEffect(() => reveal(ref.current, { focus: true }), [])
 
   return (
-    <form className="panel plan-form" onSubmit={p.onSubmit} noValidate>
+    <form ref={ref} className="panel plan-form" onSubmit={p.onSubmit} noValidate>
       <h3>{p.editing ? t('planForm.titleVersion', { name: p.editing.name }) : t('planForm.titleNew')}</h3>
 
       <label>

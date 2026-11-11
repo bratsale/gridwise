@@ -96,7 +96,7 @@ export function usePlanForm(session: FormSession, optimistic: Optimistic<Plan>, 
     else change.rollback()
 
     if (response.ok) {
-      onSaved(editing ? { kind: 'versionSaved', version: String(response.body.versionNo) } : { kind: 'created' })
+      onSaved(editing ? { kind: 'versionSaved', version: String(response.body.versionNo) } : { kind: 'created', id: response.body.id })
     } else if (response.status === 409) {
       setConflict(true)
     } else if (response.status === 400) {

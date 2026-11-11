@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { reveal } from '../../../../shared/ui/reveal.ts'
 import type { Plan } from '../api/plansApi.ts'
 
 // The latest version (highest number) tells whether the plan is retired, and from when.
@@ -18,7 +19,7 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
 
   // The row that was clicked can be far down a long list: bring the panel into view when it opens for a new item.
   useEffect(() => {
-    ref.current?.scrollIntoView?.({ block: 'nearest' })
+    reveal(ref.current, { block: 'nearest' })
   }, [plan.id])
 
   const retiredDate = versions && versions.length > 0 ? retiredFrom(versions) : null

@@ -1,27 +1,32 @@
+import { useRef } from 'react'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
+import { useRevealRow } from '../../../../shared/ui/reveal.ts'
 import { rowClass } from '../../../../shared/ui/rowClass.ts'
 import type { Plan } from '../api/plansApi.ts'
 
 export function PlanList({
-  plans, pending, loading, selectedId, onHistory, onEdit, onRetire,
+  plans, pending, loading, selectedId, flashId, onHistory, onEdit, onRetire,
 }: {
   plans: Plan[]
   pending: ReadonlySet<string>
   loading: boolean
   selectedId: string | null
+  flashId: string | null
   onHistory: (plan: Plan) => void
   onEdit: (plan: Plan) => void
   onRetire: (plan: Plan) => void
 }) {
   const t = useT()
   const format = useFormat()
+  const list = useRef<HTMLDivElement>(null)
+  useRevealRow(list, flashId, plans)
 
   if (loading) return <div className="card"><Loading /></div>
   if (plans.length === 0) return <div className="card"><p className="state">{t('plans.empty')}</p></div>
 
   return (
-    <div className="card flush table-wrap">
+    <div className="card flush table-wrap" ref={list}>
       <table className="plans">
         <thead>
           <tr>
@@ -34,7 +39,7 @@ export function PlanList({
             const retired = plan.status === 'Retired'
             const isPending = pending.has(plan.id)
             return (
-              <tr key={plan.id} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', plan.id === selectedId)}>
+              <tr key={plan.id} data-key={plan.id} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', plan.id === selectedId, plan.id === flashId)}>
                 <td>
                   <button type="button" className="link" onClick={() => onHistory(plan)}>{plan.name}</button>
                 </td>

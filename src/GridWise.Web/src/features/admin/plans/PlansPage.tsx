@@ -51,6 +51,7 @@ export function PlansPage() {
           pending={plans.pending}
           loading={plans.loading}
           selectedId={plans.history?.plan.id ?? null}
+          flashId={plans.flash}
           onHistory={(plan) => void plans.showHistory(plan)}
           onEdit={(plan) => void plans.edit(plan)}
           onRetire={plans.openRetire}
