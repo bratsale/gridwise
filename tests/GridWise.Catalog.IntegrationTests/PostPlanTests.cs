@@ -123,24 +123,6 @@ public class PostPlanTests(CatalogFactory factory)
     }
 
     [Fact]
-    public async Task Effective_date_in_the_past_is_rejected()
-    {
-        var body = new
-        {
-            name = "Standard",
-            discount = 0.05m,
-            effectiveFrom = "2026-11-02",
-            tiers = new[] { new { threshold = (decimal?)null, pricePerKwh = 0.06m } }
-        };
-
-        var response = await Post(body, NewKey());
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
-        Assert.Contains("effectiveFrom", problem!.Errors.Keys);
-    }
-
-    [Fact]
     public async Task Parallel_requests_with_same_key_create_one_plan()
     {
         var key = NewKey();

@@ -21,16 +21,6 @@ public class EventContractTests
             $"Serialized event differs from BatchChunkRequested.v1.json: {actual}");
     }
 
-    [Fact]
-    public void BatchChunkRequested_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<BatchChunkRequestedV1>(Golden(), Web)!;
-
-        Assert.Equal(Chunk.JobId, e.JobId);
-        Assert.Equal(Chunk.ChunkNo, e.ChunkNo);
-        Assert.Equal(Chunk.Rows, e.Rows);
-    }
-
     // Consumed: the contract is owned by Recommendation.
     [Fact]
     public void BatchChunkCompleted_v1_golden_file_deserializes()

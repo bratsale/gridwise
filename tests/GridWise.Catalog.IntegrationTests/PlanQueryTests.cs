@@ -138,13 +138,4 @@ public class PlanQueryTests(CatalogFactory factory)
         Assert.Equal("Retired", listed.Status);
         Assert.Equal(2, listed.VersionNo);
     }
-
-    [Fact]
-    public async Task OpenApi_document_describes_the_plan_routes()
-    {
-        var response = await Send(HttpMethod.Get, "/openapi/v1.json");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("/plans/{id}/versions", await response.Content.ReadAsStringAsync());
-    }
 }

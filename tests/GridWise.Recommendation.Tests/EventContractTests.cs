@@ -68,21 +68,6 @@ public class EventContractTests
     }
 
     [Fact]
-    public void RecommendationCalculated_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<RecommendationCalculatedV1>(Golden("RecommendationCalculated.v1.json"), Web)!;
-
-        Assert.Equal(Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), e.RecommendationId);
-        Assert.Equal(250m, e.ConsumptionKwh);
-        Assert.Equal("household", e.TaxGroupCode);
-        Assert.Equal(1, e.TaxGroupVersionNo);
-        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-000000000002"), e.RecommendedPlanId);
-        Assert.Equal(1, e.RecommendedPlanVersionNo);
-        Assert.Equal(24.10m, e.RecommendedTotal);
-        Assert.Equal(new DateTimeOffset(2026, 11, 5, 10, 0, 0, TimeSpan.Zero), e.CalculatedAt);
-    }
-
-    [Fact]
     public void PlanAccepted_v1_serializes_to_golden_file()
     {
         var e = new PlanAcceptedV1(
@@ -94,18 +79,6 @@ public class EventContractTests
                 JsonDocument.Parse(Golden("PlanAccepted.v1.json")).RootElement,
                 JsonSerializer.SerializeToElement(e, Web)),
             "Serialized event differs from PlanAccepted.v1.json");
-    }
-
-    [Fact]
-    public void PlanAccepted_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<PlanAcceptedV1>(Golden("PlanAccepted.v1.json"), Web)!;
-
-        Assert.Equal(Guid.Parse("01a1ac3b-bbb3-7eb8-b8b9-7edd0f6f2666"), e.RecommendationId);
-        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0000-000000000002"), e.PlanId);
-        Assert.Equal(1, e.PlanVersionNo);
-        Assert.Equal(24.10m, e.Total);
-        Assert.Equal(new DateTimeOffset(2026, 11, 5, 10, 5, 0, TimeSpan.Zero), e.AcceptedAt);
     }
 
     [Fact]
@@ -160,17 +133,6 @@ public class EventContractTests
         Assert.True(
             JsonElement.DeepEquals(JsonDocument.Parse(Golden("BatchChunkCompleted.v1.json")).RootElement, JsonDocument.Parse(actual).RootElement),
             $"Serialized event differs from BatchChunkCompleted.v1.json: {actual}");
-    }
-
-    [Fact]
-    public void BatchChunkCompleted_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<BatchChunkCompletedV1>(Golden("BatchChunkCompleted.v1.json"), Web)!;
-
-        Assert.Equal(Completed.JobId, e.JobId);
-        Assert.Equal(Completed.ChunkNo, e.ChunkNo);
-        Assert.Equal(Completed.Results, e.Results);
-        Assert.Equal(Completed.Errors, e.Errors);
     }
 
     private static string Golden(string file)

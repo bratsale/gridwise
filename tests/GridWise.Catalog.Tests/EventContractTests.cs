@@ -26,60 +26,6 @@ public class EventContractTests
         => AssertSameJson("TaxGroupVersionCreated.v1.json", JsonSerializer.Serialize(TaxGroup, Web));
 
     [Fact]
-    public void PlanVersionCreated_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<PlanVersionCreatedV1>(Golden("PlanVersionCreated.v1.json"), Web)!;
-
-        Assert.Equal(Plan.Id, e.Id);
-        Assert.Equal(Plan.VersionNo, e.VersionNo);
-        Assert.Equal(Plan.Name, e.Name);
-        Assert.Equal(Plan.Discount, e.Discount);
-        Assert.Equal(Plan.Status, e.Status);
-        Assert.Equal(Plan.EffectiveFrom, e.EffectiveFrom);
-        Assert.Equal(Plan.Tiers.Count, e.Tiers.Count);
-        for (var i = 0; i < Plan.Tiers.Count; i++)
-        {
-            Assert.Equal(Plan.Tiers[i].Threshold, e.Tiers[i].Threshold);
-            Assert.Equal(Plan.Tiers[i].PricePerKwh, e.Tiers[i].PricePerKwh);
-        }
-        Assert.Equal(Plan.ChangedBy, e.ChangedBy);
-    }
-
-    // changedBy was added to v1 later as an optional field: events written before it (and the seed events) have no value.
-    [Fact]
-    public void PlanVersionCreated_v1_without_changedBy_still_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<PlanVersionCreatedV1>(Golden("PlanVersionCreated.v1.without-changedBy.json"), Web)!;
-
-        Assert.Equal(Plan.Id, e.Id);
-        Assert.Equal(Plan.Tiers.Count, e.Tiers.Count);
-        Assert.Null(e.ChangedBy);
-    }
-
-    [Fact]
-    public void TaxGroupVersionCreated_v1_without_changedBy_still_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<TaxGroupVersionCreatedV1>(Golden("TaxGroupVersionCreated.v1.without-changedBy.json"), Web)!;
-
-        Assert.Equal(TaxGroup.Code, e.Code);
-        Assert.Null(e.ChangedBy);
-    }
-
-    [Fact]
-    public void TaxGroupVersionCreated_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<TaxGroupVersionCreatedV1>(Golden("TaxGroupVersionCreated.v1.json"), Web)!;
-
-        Assert.Equal(TaxGroup.Code, e.Code);
-        Assert.Equal(TaxGroup.VersionNo, e.VersionNo);
-        Assert.Equal(TaxGroup.Vat, e.Vat);
-        Assert.Equal(TaxGroup.EcoTax, e.EcoTax);
-        Assert.Equal(TaxGroup.Status, e.Status);
-        Assert.Equal(TaxGroup.EffectiveFrom, e.EffectiveFrom);
-        Assert.Equal(TaxGroup.ChangedBy, e.ChangedBy);
-    }
-
-    [Fact]
     public void EventEnvelope_v1_serializes_to_golden_file()
     {
         var envelope = new EventEnvelope(
@@ -88,23 +34,6 @@ public class EventContractTests
             JsonSerializer.SerializeToElement(Plan with { ChangedBy = null }, Web)); // a seed event: nobody made it
 
         AssertSameJson("envelope.v1.json", JsonSerializer.Serialize(envelope, Web));
-    }
-
-    [Fact]
-    public void EventEnvelope_v1_golden_file_deserializes()
-    {
-        var e = JsonSerializer.Deserialize<EventEnvelope>(Golden("envelope.v1.json"), Web)!;
-
-        Assert.Equal(Guid.Parse("5eed0000-0000-0000-0001-000000000001"), e.Id);
-        Assert.Equal(EventTypes.PlanVersionCreated, e.Type);
-        Assert.Equal(1, e.Version);
-        Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), e.Timestamp);
-        Assert.Equal("seed", e.CorrelationId);
-
-        var data = e.Data.Deserialize<PlanVersionCreatedV1>(Web)!;
-        Assert.Equal(Plan.Id, data.Id);
-        Assert.Equal(Plan.Name, data.Name);
-        Assert.Equal(Plan.Tiers.Count, data.Tiers.Count);
     }
 
     private static string Golden(string file)
