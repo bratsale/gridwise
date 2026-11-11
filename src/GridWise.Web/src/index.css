@@ -545,6 +545,21 @@ legend {
   flex: 1;
 }
 
+/* A banner that closes (by itself after a few seconds, or with its button) fades out; without the fade for less motion. */
+.banner {
+  transition: opacity 0.2s ease-out;
+}
+
+.banner.leaving {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    transition: none;
+  }
+}
+
 /* The API's own text behind a translated message: smaller, on its own line. */
 .banner-detail {
   display: block;

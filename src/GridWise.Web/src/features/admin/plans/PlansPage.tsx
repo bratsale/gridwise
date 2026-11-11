@@ -27,7 +27,8 @@ export function PlansPage() {
       </div>
 
       {plans.notice && (
-        <div className="notice" role="status">
+        // Keyed by the notice, so the next save shows a new banner with a new timer.
+        <div className="notice" role="status" key={JSON.stringify(plans.notice)}>
           <Banner kind="success" onDismiss={plans.dismissNotice}>{noticeText(plans.notice)}.</Banner>
           <Banner kind="info">{t('admin.notice.delay')}</Banner>
         </div>

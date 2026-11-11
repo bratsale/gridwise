@@ -33,7 +33,7 @@ export function PlanHistory({ plan, versions }: { plan: Plan; versions: Plan[] |
         <p className="state">{t('plans.history.empty')}</p>
       ) : (
         <>
-          {retiredDate && <Banner kind="info">{t('plans.history.retiredFrom', { date: format.date(retiredDate) })}</Banner>}
+          {retiredDate && <Banner kind="info" persistent>{t('plans.history.retiredFrom', { date: format.date(retiredDate) })}</Banner>}
           <div className="table-wrap">
             <table className="plans">
               <thead>

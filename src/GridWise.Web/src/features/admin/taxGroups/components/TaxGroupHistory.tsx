@@ -33,7 +33,7 @@ export function TaxGroupHistory({ taxGroup, versions }: { taxGroup: TaxGroup; ve
         <p className="state">{t('taxGroups.history.empty')}</p>
       ) : (
         <>
-          {retiredDate && <Banner kind="info">{t('taxGroups.history.retiredFrom', { date: format.date(retiredDate) })}</Banner>}
+          {retiredDate && <Banner kind="info" persistent>{t('taxGroups.history.retiredFrom', { date: format.date(retiredDate) })}</Banner>}
           <div className="table-wrap">
             <table className="plans">
               <thead>

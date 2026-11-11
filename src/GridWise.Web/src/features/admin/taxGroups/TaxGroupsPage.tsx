@@ -27,7 +27,8 @@ export function TaxGroupsPage() {
       </div>
 
       {groups.notice && (
-        <div className="notice" role="status">
+        // Keyed by the notice, so the next save shows a new banner with a new timer.
+        <div className="notice" role="status" key={JSON.stringify(groups.notice)}>
           <Banner kind="success" onDismiss={groups.dismissNotice}>{noticeText(groups.notice)}.</Banner>
           <Banner kind="info">{t('admin.notice.delay')}</Banner>
         </div>
