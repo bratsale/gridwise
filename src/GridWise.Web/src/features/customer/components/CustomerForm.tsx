@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react'
+import { taxGroupLabel } from '../../../shared/i18n/taxGroupName.ts'
 import { useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../shared/i18n/message.ts'
 import { FieldErrors } from '../../../shared/ui/FieldErrors.tsx'
@@ -45,7 +46,7 @@ export function CustomerForm({
         <select required value={taxGroup} onChange={(e) => onTaxGroup(e.target.value)} onBlur={() => onBlur('taxGroup')}>
           {taxGroupsLoading && <option value="">{t('common.loading')}</option>}
           {taxGroups.map((g) => (
-            <option key={g.code} value={g.code}>{g.code}</option>
+            <option key={g.code} value={g.code}>{taxGroupLabel(t, g.code)}</option>
           ))}
         </select>
         <FieldErrors messages={errors('taxGroup')} />

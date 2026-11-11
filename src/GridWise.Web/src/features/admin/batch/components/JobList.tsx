@@ -28,8 +28,9 @@ export function JobList({
               <td><button type="button" className="link" onClick={() => onOpen(job.id)}>{job.fileName}</button></td>
               <td><StatusBadge status={job.status} /></td>
               <td className="progress-cell">
-                <ProgressBar value={job.completedChunks} max={job.totalChunks} label={t('batch.col.progress')} />
-                <span className="hint">{t('batch.chunks', { done: job.completedChunks, total: job.totalChunks })}</span>
+                {/* In rows (valid and invalid), what the admin uploaded; chunks are an internal unit. */}
+                <ProgressBar value={job.processedRows + job.failedRows} max={job.totalRows} label={t('batch.col.progress')} />
+                <span className="hint">{t('batch.progress', { done: format.integer(job.processedRows + job.failedRows), total: format.integer(job.totalRows) })}</span>
               </td>
               <td className="mono">{t('batch.rows', { processed: format.integer(job.processedRows), failed: format.integer(job.failedRows) })}</td>
               <td className="mono wide-only">{format.dateTime(job.createdAt)}</td>

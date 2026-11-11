@@ -14,6 +14,7 @@ export function generalMessages(problem: ProblemDetails | undefined, knownFields
   if (!problem) return []
   const known = new Set(knownFields.map((f) => f.toLowerCase()))
   const errors = Object.entries(problem.errors ?? {})
-  if (errors.length === 0) return problem.title ? [raw(problem.title)] : []
+  // Without field errors the title is the server's general English text: a translated message instead, the title as detail.
+  if (errors.length === 0) return problem.title ? [{ key: 'error.badRequest', detail: problem.title }] : []
   return errors.filter(([key]) => !known.has(key.toLowerCase())).flatMap(([, messages]) => messages.map(raw))
 }

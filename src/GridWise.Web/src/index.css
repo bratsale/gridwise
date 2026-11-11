@@ -545,6 +545,14 @@ legend {
   flex: 1;
 }
 
+/* The API's own text behind a translated message: smaller, on its own line. */
+.banner-detail {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
 .banner button.icon {
   margin-left: auto;
   min-height: 28px;

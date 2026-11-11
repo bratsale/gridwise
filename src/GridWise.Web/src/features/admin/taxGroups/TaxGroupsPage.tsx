@@ -1,4 +1,4 @@
-import { useFormat, useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
+import { useFormat, useT } from '../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { TaxGroupHistory } from './components/TaxGroupHistory.tsx'
 import { TaxGroupList } from './components/TaxGroupList.tsx'
@@ -8,7 +8,6 @@ import { TaxGroupRetireSection } from './TaxGroupRetireSection.tsx'
 
 export function TaxGroupsPage() {
   const t = useT()
-  const text = useMessageText()
   const format = useFormat()
   const groups = useTaxGroupList()
 
@@ -33,8 +32,8 @@ export function TaxGroupsPage() {
           <Banner kind="info">{t('admin.notice.delay')}</Banner>
         </div>
       )}
-      {groups.listError && <Banner kind="error">{text(groups.listError)}</Banner>}
-      {groups.rowError && <Banner kind="error">{text(groups.rowError)}</Banner>}
+      {groups.listError && <Banner kind="error" message={groups.listError} />}
+      {groups.rowError && <Banner kind="error" message={groups.rowError} />}
 
       {groups.form && (
         <TaxGroupFormSection

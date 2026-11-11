@@ -1,11 +1,10 @@
 import { useRef, useState, type DragEvent } from 'react'
-import { useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
+import { useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { useUpload } from '../hooks/useUpload.ts'
 
 export function UploadSection({ onAccepted }: { onAccepted: (jobId: string) => void }) {
   const t = useT()
-  const text = useMessageText()
   const { uploading, error, upload, clearError } = useUpload(onAccepted)
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -40,7 +39,7 @@ export function UploadSection({ onAccepted }: { onAccepted: (jobId: string) => v
       <p className="hint">
         {t('batch.upload.format')} <a href="/sample-batch.csv" download>{t('batch.upload.sample')}</a>
       </p>
-      {error && <Banner kind="error" onDismiss={clearError}>{text(error)}</Banner>}
+      {error && <Banner kind="error" onDismiss={clearError} message={error} />}
     </section>
   )
 }

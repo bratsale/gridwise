@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
+import { useT } from '../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { JobDetail } from './components/JobDetail.tsx'
 import { JobList } from './components/JobList.tsx'
@@ -8,7 +8,6 @@ import { useJobs } from './hooks/useJobs.ts'
 
 export function BatchPage() {
   const t = useT()
-  const text = useMessageText()
   const jobs = useJobs()
   const [openId, setOpenId] = useState<string | null>(null)
   const opened = jobs.jobs.find((job) => job.id === openId)
@@ -26,7 +25,7 @@ export function BatchPage() {
 
       <UploadSection onAccepted={(id) => void accepted(id)} />
 
-      {jobs.error && <Banner kind="error">{text(jobs.error)}</Banner>}
+      {jobs.error && <Banner kind="error" message={jobs.error} />}
 
       {opened && (
         <JobDetail

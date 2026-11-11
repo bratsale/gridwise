@@ -1,4 +1,4 @@
-import { useMessageText } from '../../shared/i18n/useLanguage.ts'
+
 import { Banner } from '../../shared/ui/Banner.tsx'
 import { CustomerForm } from './components/CustomerForm.tsx'
 import { RecommendationResult } from './components/RecommendationResult.tsx'
@@ -6,7 +6,6 @@ import { useCalculator } from './hooks/useCalculator.ts'
 import { useTaxGroups } from './hooks/useTaxGroups.ts'
 
 export function CustomerPage() {
-  const text = useMessageText()
   const groups = useTaxGroups()
   const calc = useCalculator(groups.taxGroups)
 
@@ -25,8 +24,8 @@ export function CustomerPage() {
         onSubmit={(e) => void calc.calculate(e)}
       />
 
-      {groups.error && <Banner kind="error">{text(groups.error)}</Banner>}
-      {calc.message && <Banner kind="error">{text(calc.message)}</Banner>}
+      {groups.error && <Banner kind="error" message={groups.error} />}
+      {calc.message && <Banner kind="error" message={calc.message} />}
 
       {calc.result && (
         <RecommendationResult

@@ -1,4 +1,4 @@
-import { useFormat, useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
+import { useFormat, useT } from '../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { PlanHistory } from './components/PlanHistory.tsx'
 import { PlanList } from './components/PlanList.tsx'
@@ -8,7 +8,6 @@ import { RetireSection } from './RetireSection.tsx'
 
 export function PlansPage() {
   const t = useT()
-  const text = useMessageText()
   const format = useFormat()
   const plans = usePlans()
 
@@ -33,8 +32,8 @@ export function PlansPage() {
           <Banner kind="info">{t('admin.notice.delay')}</Banner>
         </div>
       )}
-      {plans.listError && <Banner kind="error">{text(plans.listError)}</Banner>}
-      {plans.rowError && <Banner kind="error">{text(plans.rowError)}</Banner>}
+      {plans.listError && <Banner kind="error" message={plans.listError} />}
+      {plans.rowError && <Banner kind="error" message={plans.rowError} />}
 
       {plans.form && (
         <PlanFormSection key={plans.form.key} session={plans.form.session} optimistic={plans.optimistic} onSaved={plans.changed} onCancel={plans.closeForm} />

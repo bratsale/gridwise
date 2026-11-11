@@ -79,7 +79,7 @@ export function TaxGroupForm(p: TaxGroupFormProps) {
       </label>
 
       {p.general.length > 0 && <Banner kind="error">{p.general.map(text).join(' ')}</Banner>}
-      {p.message && <Banner kind="error">{text(p.message)}</Banner>}
+      {p.message && <Banner kind="error" message={p.message} />}
       {p.conflict && (
         <Banner kind="error">
           {t('taxGroups.conflict')} <button type="button" className="small" onClick={p.onReload}>{t('common.reload')}</button>

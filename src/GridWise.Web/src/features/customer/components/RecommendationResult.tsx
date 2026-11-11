@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useFormat, useMessageText, useT } from '../../../shared/i18n/useLanguage.ts'
+import { taxGroupLabel } from '../../../shared/i18n/taxGroupName.ts'
+import { useFormat, useT } from '../../../shared/i18n/useLanguage.ts'
 import type { Message } from '../../../shared/i18n/message.ts'
 import { Banner } from '../../../shared/ui/Banner.tsx'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog.tsx'
@@ -21,7 +22,6 @@ export function RecommendationResult({
   onAccept: (quote: Quote) => void
 }) {
   const t = useT()
-  const text = useMessageText()
   const format = useFormat()
   const ref = useRef<HTMLDivElement>(null)
   const [showAll, setShowAll] = useState(false)
@@ -38,7 +38,7 @@ export function RecommendationResult({
       <p className="meta">
         {t('customer.meta', {
           kwh: format.kwh(result.consumptionKwh),
-          code: result.taxGroup.code,
+          code: taxGroupLabel(t, result.taxGroup.code),
           version: String(result.taxGroup.versionNo),
           at: format.dateTime(result.calculatedAt),
         })}
@@ -48,7 +48,7 @@ export function RecommendationResult({
       {accepted && (
         <Banner kind="success">{t('customer.accepted', { plan: accepted.plan, total: format.money(accepted.total) })}</Banner>
       )}
-      {acceptError && <Banner kind="error">{text(acceptError)}</Banner>}
+      {acceptError && <Banner kind="error" message={acceptError} />}
 
       <div className="card flush table-wrap">
         <table className="plans">

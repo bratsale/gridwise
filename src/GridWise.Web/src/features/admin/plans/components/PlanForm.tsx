@@ -67,7 +67,7 @@ export function PlanForm(p: PlanFormProps) {
       <TiersEditor tiers={p.tiers} onChange={p.onTiers} errors={p.errors} onBlur={p.onBlur} />
 
       {p.general.length > 0 && <Banner kind="error">{p.general.map(text).join(' ')}</Banner>}
-      {p.message && <Banner kind="error">{text(p.message)}</Banner>}
+      {p.message && <Banner kind="error" message={p.message} />}
       {p.conflict && (
         <Banner kind="error">
           {t('plans.conflict')} <button type="button" className="small" onClick={p.onReload}>{t('common.reload')}</button>

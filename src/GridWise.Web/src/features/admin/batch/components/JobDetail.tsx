@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../../../shared/auth/auth.ts'
-import { useFormat, useMessageText, useT } from '../../../../shared/i18n/useLanguage.ts'
+import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Banner } from '../../../../shared/ui/Banner.tsx'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog.tsx'
 import { ProgressBar } from '../../../../shared/ui/ProgressBar.tsx'
@@ -19,7 +19,6 @@ export function JobDetail({
   onClose: () => void
 }) {
   const t = useT()
-  const text = useMessageText()
   const format = useFormat()
   const { accessToken } = useAuth()
   const { progress, reconnecting } = useJobProgress(job.id, { onProgress, onTerminal: onFinished, accessToken })
@@ -42,17 +41,16 @@ export function JobDetail({
         <button type="button" className="small" onClick={onClose}>{t('batch.detail.close')}</button>
       </div>
 
-      <ProgressBar value={current.completedChunks} max={current.totalChunks} label={t('batch.col.progress')} />
+      {/* In rows (valid and invalid), what the admin uploaded; chunks are an internal unit. */}
+      <ProgressBar value={current.processedRows + current.failedRows} max={job.totalRows} label={t('batch.col.progress')} />
       <p className="meta">
-        {t('batch.chunks', { done: current.completedChunks, total: current.totalChunks })}
-        {' · '}
         {t('batch.detail.rows', {
           processed: format.integer(current.processedRows), failed: format.integer(current.failedRows), total: format.integer(job.totalRows),
         })}
       </p>
 
       {reconnecting && !done && <Banner kind="warning">{t('batch.reconnecting')}</Banner>}
-      {cancel.error && <Banner kind="error">{text(cancel.error)}</Banner>}
+      {cancel.error && <Banner kind="error" message={cancel.error} />}
       {downloadFailed && <Banner kind="error">{t('batch.download.failed')}</Banner>}
 
       <div className="actions">

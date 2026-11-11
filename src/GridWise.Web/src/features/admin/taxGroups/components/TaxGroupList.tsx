@@ -1,3 +1,4 @@
+import { taxGroupLabel } from '../../../../shared/i18n/taxGroupName.ts'
 import { useFormat, useT } from '../../../../shared/i18n/useLanguage.ts'
 import { Loading } from '../../../../shared/ui/Loading.tsx'
 import { rowClass } from '../../../../shared/ui/rowClass.ts'
@@ -37,7 +38,7 @@ export function TaxGroupList({
             return (
               <tr key={group.code} className={rowClass(isPending ? 'pending' : retired ? 'retired' : '', group.code === selectedCode)}>
                 <td>
-                  <button type="button" className="link" onClick={() => onHistory(group)}>{group.code}</button>
+                  <button type="button" className="link" onClick={() => onHistory(group)}>{taxGroupLabel(t, group.code)}</button>
                 </td>
                 <td className="mono">{String(group.versionNo)}</td>
                 <td>

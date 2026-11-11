@@ -62,7 +62,8 @@ export function useCalculator(taxGroups: TaxGroup[]) {
       const others = Object.entries(response.body?.errors ?? {})
         .filter(([key]) => !['consumptionkwh', 'taxgroup'].includes(key.toLowerCase()))
         .flatMap(([, messages]) => messages)
-      if (others.length > 0 || !response.body?.errors) setMessage(raw([...others, response.body?.title].filter(Boolean).join(' ')))
+      if (others.length > 0) setMessage(raw(others.join(' ')))
+      else if (!response.body?.errors) setMessage(failureMessage(response))
     } else if (response.status === 503) {
       setMessage(msg('customer.noPlansYet'))
     } else {

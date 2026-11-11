@@ -35,7 +35,7 @@ export function RetirePanel({
         <FieldErrors messages={dateErrors} />
       </label>
       {general.length > 0 && <Banner kind="error">{general.map(text).join(' ')}</Banner>}
-      {message && <Banner kind="error">{text(message)}</Banner>}
+      {message && <Banner kind="error" message={message} />}
       <div className="actions">
         <button type="submit" className="danger" disabled={submitting}>{submitting ? t('retire.submitting') : t('retire.submit')}</button>
         <button type="button" onClick={onCancel}>{t('common.cancel')}</button>
