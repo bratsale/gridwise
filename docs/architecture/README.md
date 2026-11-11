@@ -12,6 +12,7 @@ and how the parts talk to each other. Everything here is taken from the code and
   [0009 synchronous vs asynchronous communication](../decisions/0009-sync-vs-async.md) and
   [0005 outbox, topics and events](../decisions/0005-outbox-and-events.md)
 - Event contracts: [../events/README.md](../events/README.md)
+- Test strategy (what is tested where, and what CI runs): [../testing.md](../testing.md)
 
 ## Context
 
