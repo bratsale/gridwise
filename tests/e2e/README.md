@@ -21,6 +21,8 @@ The dev users of the `gridwise` realm (`keycloak/realm-gridwise.json`):
 |---|---|---|---|
 | `admin` | `admin_dev_pw` | admin | creating and retiring the plan, batch |
 | `customer` | `customer_dev_pw` | customer | calculating and accepting, the permission test |
+| `admin2` | `admin2_dev_pw` | admin | not used by the tests; a second admin for trying things by hand |
+| `customer2` | `customer2_dev_pw` | customer | not used by the tests; a second customer, for example to check that one customer cannot see another's recommendation |
 
 ## Prerequisites
 

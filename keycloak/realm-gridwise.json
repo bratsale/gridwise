@@ -53,6 +53,44 @@
         "customer",
         "default-roles-gridwise"
       ]
+    },
+    {
+      "username": "admin2",
+      "enabled": true,
+      "email": "admin2@gridwise.local",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Dev 2",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin2_dev_pw",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin",
+        "default-roles-gridwise"
+      ]
+    },
+    {
+      "username": "customer2",
+      "enabled": true,
+      "email": "customer2@gridwise.local",
+      "emailVerified": true,
+      "firstName": "Customer",
+      "lastName": "Dev 2",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer2_dev_pw",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "customer",
+        "default-roles-gridwise"
+      ]
     }
   ],
   "clients": [

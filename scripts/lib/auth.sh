@@ -1,20 +1,26 @@
 # Shared by the scripts that call the API (sourced, not run). Needs curl and jq.
 #   source scripts/lib/auth.sh
-#   TOKEN=$(get_token admin)        # or: get_token customer
+#   TOKEN=$(get_token admin)        # or: get_token customer, get_token admin2, get_token customer2
 #   curl -H "Authorization: Bearer $TOKEN" ...
 # The token comes from Keycloak through the gridwise-cli client (password grant, dev only, see keycloak/README.md). It is valid for
 # 30 minutes (a client-level setting of gridwise-cli), so a script can fetch it once at the start.
 # Everything can be overridden in the environment:
 #   KEYCLOAK_URL (default http://localhost:$WEB_PORT/auth, WEB_PORT default 5100), KEYCLOAK_REALM (gridwise),
 #   GRIDWISE_ADMIN_USER / GRIDWISE_ADMIN_PASSWORD (admin / admin_dev_pw),
-#   GRIDWISE_CUSTOMER_USER / GRIDWISE_CUSTOMER_PASSWORD (customer / customer_dev_pw).
+#   GRIDWISE_CUSTOMER_USER / GRIDWISE_CUSTOMER_PASSWORD (customer / customer_dev_pw),
+#   GRIDWISE_ADMIN2_USER / GRIDWISE_ADMIN2_PASSWORD (admin2 / admin2_dev_pw),
+#   GRIDWISE_CUSTOMER2_USER / GRIDWISE_CUSTOMER2_PASSWORD (customer2 / customer2_dev_pw).
+# The second admin and customer are for checks between two users of the same role (for example that a customer cannot read
+# another customer's recommendation).
 
 get_token() {
   local role=${1:-} user password
   case "$role" in
     admin) user=${GRIDWISE_ADMIN_USER:-admin}; password=${GRIDWISE_ADMIN_PASSWORD:-admin_dev_pw} ;;
     customer) user=${GRIDWISE_CUSTOMER_USER:-customer}; password=${GRIDWISE_CUSTOMER_PASSWORD:-customer_dev_pw} ;;
-    *) echo "get_token: unknown role '$role' (use admin or customer)" >&2; return 2 ;;
+    admin2) user=${GRIDWISE_ADMIN2_USER:-admin2}; password=${GRIDWISE_ADMIN2_PASSWORD:-admin2_dev_pw} ;;
+    customer2) user=${GRIDWISE_CUSTOMER2_USER:-customer2}; password=${GRIDWISE_CUSTOMER2_PASSWORD:-customer2_dev_pw} ;;
+    *) echo "get_token: unknown user '$role' (use admin, customer, admin2 or customer2)" >&2; return 2 ;;
   esac
 
   local keycloak=${KEYCLOAK_URL:-http://localhost:${WEB_PORT:-5100}/auth}
