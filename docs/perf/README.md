@@ -54,6 +54,23 @@ The whole stack (service, both databases, Kafka) and k6 run on this one machine.
 Per phase (Server-Timing, avg): single before db-read 4.8, calc 1.4, json 1.1, save 35.3 ms;
 single after db-read 4.5, calc 1.2, json 0.2, save 7.0 ms. Default after: db-read 14.9, calc 3.3, json 0.7, save 25.0 ms.
 
+### After identity, gateway and observability (2026-11-11)
+
+The service now validates the access token on every request and exports traces. Measured with `bash scripts/perf/run.sh` (target scenario)
+on a fresh stack (`docker compose down -v`, then `up`), on a quiet machine (browser closed), same hardware as above. 200 plans, two runs.
+
+| Date | Version | Scenario | p50 | p95 | p99 | req/s | Errors | Result |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-11 | with token validation and trace export, run 1 | **target** (50/s, 60 s) | 11.23 ms | 28.25 ms | 56.3 ms | 50 (0 dropped) | 0% | passes |
+| 2026-11-11 | with token validation and trace export, run 2 | **target** (50/s, 60 s) | 11.15 ms | 25.46 ms | 45.78 ms | 50 (0 dropped) | 0% | passes |
+
+Per phase (Server-Timing, avg): db_read ~4.4, calc ~1.1, json ~0.2, save ~5.8 ms, in line with the "after" numbers above.
+The p95 is a few milliseconds higher than on 2026-11-06 (23.5 ms), the median is about the same (11.6 ms then), and stays well below the 50 ms target.
+
+**Note on the runs of 2026-11-10.** Runs made while the full test suite and other containers were running at the same time showed a p95 of
+47-541 ms and dropped iterations. The machine was swapping then. On a quiet machine the same code meets the target (above), so those runs
+measured the machine's memory pressure, not the service. For a meaningful result, run the test on a fresh stack with nothing else heavy running.
+
 # Performance: batch jobs
 
 ## Requirement
