@@ -177,8 +177,7 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
     }
 
     // Consumption must be 0 or more, with at most 3 decimal places (kWh as text: attributes cannot hold decimals).
-    // A rejected value is reported on consumptionKwh, so the form can show it next to the field. The key is compared ignoring
-    // case, like the web client does: [Range] reports "ConsumptionKwh", the decimal-places check "consumptionKwh".
+    // A rejected value is reported on consumptionKwh, so the form can show it next to the field.
     [Theory]
     [InlineData("-1", HttpStatusCode.BadRequest, null)]
     [InlineData("250.0005", HttpStatusCode.BadRequest, "At most 3 decimal places.")]
@@ -192,7 +191,7 @@ public class RecommendationTests(RecommendationFactory factory) : IAsyncLifetime
         Assert.Equal(expected, response.StatusCode);
         if (expected != HttpStatusCode.BadRequest) return;
         var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
-        var errors = Assert.Single(problem!.Errors, e => e.Key.Equals("consumptionKwh", StringComparison.OrdinalIgnoreCase)).Value;
+        var errors = Assert.Single(problem!.Errors, e => e.Key == "consumptionKwh").Value;
         if (message is not null) Assert.Equal(message, Assert.Single(errors));
     }
 

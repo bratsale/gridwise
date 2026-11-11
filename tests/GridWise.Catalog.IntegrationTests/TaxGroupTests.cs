@@ -86,7 +86,6 @@ public class TaxGroupTests(CatalogFactory factory)
     }
 
     // A code must be lower case (letters, digits, dashes) and VAT a fraction from 0 to 1; the error names the field.
-    // The key is compared ignoring case, like the web client does (data annotations report "Code" and "Vat").
     [Theory]
     [InlineData("an upper-case code", "Household", "0.17", "code")]
     [InlineData("VAT above 100 %", null, "1.5", "vat")]
@@ -96,8 +95,7 @@ public class TaxGroupTests(CatalogFactory factory)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
-        Assert.True(problem!.Errors.Keys.Any(k => k.Equals(errorOn, StringComparison.OrdinalIgnoreCase)),
-            $"{input}: expected an error on '{errorOn}', got: {string.Join(", ", problem.Errors.Keys)}");
+        Assert.True(problem!.Errors.ContainsKey(errorOn), $"{input}: expected an error on '{errorOn}', got: {string.Join(", ", problem.Errors.Keys)}");
     }
 
     [Fact]

@@ -34,7 +34,7 @@ builder.Services.AddDbContext<RecommendationDbContext>(options =>
         .UseSnakeCaseNamingConvention());
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ValidationErrorKeys.UseCamelCase);
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<RecommendationDbContext>(tags: ["ready"]);
