@@ -29,6 +29,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      actions: read # to read the CI/CD run of the SHA
     env:
       # Repository secrets named <ENVIRONMENT>_<NAME>, for example QA_CATALOG_DB_PASSWORD; the dev defaults when a secret is not set.
       CATALOG_DB_PASSWORD: ${{ secrets[format('{0}_CATALOG_DB_PASSWORD', inputs.environment)] || 'catalog_dev_pw' }}
@@ -67,6 +68,34 @@ jobs:
             fi
           done
           exit $missing
+
+      # Only a SHA whose CI/CD run passed completely (backend, web, images, e2e, deploy-dev) may reach qa or prod: images exist as soon
+      # as backend and web pass, so their existence alone does not prove the e2e tests passed. The run must be the push to main, the one
+      # that built the images and ran e2e; a branch or pull request run of the same commit skips those jobs and still ends as success.
+      # If main has several runs for the commit, the newest counts; a re-run updates the conclusion of its run.
+      - name: Check that CI/CD passed for this SHA
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$TAG" --branch main --event push --limit 1 \
+            --json conclusion,status,url --jq '.[0] // empty')
+          if [[ -z "$run" ]]; then
+            echo "::error::No CI/CD run on main for $TAG. Only commits pushed to main are built and tested end to end."
+            exit 1
+          fi
+          status=$(jq -r .status <<< "$run")
+          conclusion=$(jq -r .conclusion <<< "$run")
+          url=$(jq -r .url <<< "$run")
+          if [[ "$status" != completed ]]; then
+            echo "::error::The CI/CD run for $TAG has not finished yet (status: $status). Wait for it and start the promotion again: $url"
+            exit 1
+          fi
+          if [[ "$conclusion" != success ]]; then
+            echo "::error::The CI/CD run for $TAG did not succeed (conclusion: $conclusion). Only a fully green run may be promoted: $url"
+            exit 1
+          fi
+          echo "CI/CD passed for $TAG: $url"
 
       - uses: ./.github/actions/deploy
         with:

@@ -163,6 +163,8 @@ So a failing unit or integration test stops a branch before images are built. A 
 deployment to dev. Whether a failing check blocks merging a pull request depends on the branch protection rules in GitHub, which
 are not part of the repository.
 
-Deployments to qa and prod (`.github/workflows/promote.yml`) are manual and do not run tests again. They check that the images
-for the given SHA exist, deploy them and run the smoke test. Note that images exist as soon as `backend` and `web` have passed,
-so `promote.yml` would also accept a SHA whose `e2e` job failed. Promote only SHAs whose CI run is green.
+Deployments to qa and prod (`.github/workflows/promote.yml`) are manual and do not run tests again. Instead they refuse a SHA unless
+the `CI/CD` run of the push to `main` for that exact commit has finished with conclusion `success`, which means every job passed,
+including `e2e` and `deploy-dev`. They fail with a clear message, and a link to the run, when there is no such run, when it is
+still running, or when it failed or was cancelled. Together with the check that the images exist, this runs before anything is
+deployed; the deployment ends with the smoke test. So no commit reaches qa or prod without having passed the whole suite, the end-to-end tests included.

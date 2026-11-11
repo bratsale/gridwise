@@ -13,7 +13,7 @@ flowchart LR
   web --> images
   images[images<br/>build once, push :sha<br/>only on main] --> e2e[e2e<br/>Playwright on the pushed images]
   e2e --> dev[deploy-dev<br/>automatic]
-  manual[promote.yml<br/>by hand: environment + SHA] --> check[check the images exist]
+  manual[promote.yml<br/>by hand: environment + SHA] --> check[check the images exist<br/>and CI/CD passed for the SHA]
   check --> target[deploy to qa or prod<br/>same images]
 ```
 
@@ -69,8 +69,14 @@ rolling back means deploying an older one.
 
 1. Find the SHA: the commit of a successful `CI/CD` run on `main` (the full 40 characters; Actions → the run → the commit link).
 2. Actions → **Promote** → Run workflow. Choose `environment` (`qa` or `prod`) and paste the SHA into `tag`.
-3. The workflow checks that all five images for that SHA exist in ghcr.io (and fails with the missing names if not), pulls them,
-   starts the stack with `deploy/<environment>.env`, runs the smoke test and stops it (the deployment is simulated).
+3. The workflow checks that all five images for that SHA exist in ghcr.io (and fails with the missing names if not).
+4. It checks that the `CI/CD` run of the push to `main` for that commit finished with conclusion `success`, so every job passed,
+   `e2e` and `deploy-dev` included. It refuses the SHA, with a link to the run, if there is no such run, if it is still running, or
+   if it failed or was cancelled. The images alone are not proof: they exist as soon as `backend` and `web` pass, before `e2e` runs.
+   A run of the same commit on another branch or a pull request does not count, because it skips `images` and `e2e`. If `main` has
+   several runs for the commit, the newest one counts, and re-running a failed run updates its conclusion. The workflow reads the
+   runs with `gh run list` and the `GITHUB_TOKEN`, which is why its job has the `actions: read` permission.
+5. It pulls the images, starts the stack with `deploy/<environment>.env`, runs the smoke test and stops it (the deployment is simulated).
 
 Notes:
 - Do not delete old image tags from the registry, or the rollback to them is not possible.
