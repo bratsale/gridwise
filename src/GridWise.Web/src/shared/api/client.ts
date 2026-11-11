@@ -1,4 +1,4 @@
-import { currentAccessToken, reportUnauthorized } from '../auth/session.ts'
+import { sendWithToken } from '../auth/session.ts'
 
 export type Service = 'catalog' | 'recommendation' | 'batch'
 
@@ -33,14 +33,14 @@ export interface RequestOptions {
 }
 
 // Thin fetch wrapper: no throwing on HTTP errors, the caller looks at status, body and headers (e.g. ETag).
-// Every request carries the user's access token. A 401 (no token, or one the API no longer accepts) starts a login.
+// Every request carries the user's access token. A 401 (no token, or one the API no longer accepts) renews the session silently
+// and sends the request once more; only if that fails does a login start (sendWithToken).
 export async function request<T>(
   service: Service,
   path: string,
   { method = 'GET', body, headers = {} }: RequestOptions = {},
 ): Promise<ApiResponse<T>> {
-  const token = currentAccessToken()
-  const response = await fetch(`${basePaths[service]}${path}`, {
+  const response = await sendWithToken((token) => fetch(`${basePaths[service]}${path}`, {
     method,
     headers: {
       'X-Correlation-Id': crypto.randomUUID(),
@@ -49,10 +49,9 @@ export async function request<T>(
       ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },
+    // A FormData body can be sent again as it is, if the request is repeated after a renewal.
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-  })
-
-  if (response.status === 401) reportUnauthorized()
+  }))
 
   const text = await response.text()
   let parsed: unknown

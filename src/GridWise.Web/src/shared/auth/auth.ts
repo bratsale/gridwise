@@ -17,6 +17,7 @@ let state: AuthState = { ...anonymous, status: 'loading' }
 const listeners = new Set<() => void>()
 let manager: UserManager | null = null
 let redirecting = false
+let recovering: Promise<boolean> | null = null
 
 function setState(next: AuthState) {
   state = next
@@ -46,6 +47,31 @@ export function login() {
   void userManager().signinRedirect({ state: { returnTo: window.location.hash } })
 }
 
+/**
+ * Renews the session without user interaction through the hidden iframe (prompt=none), which uses Keycloak's session cookie.
+ * Used when the access token expired or the automatic renewal with the refresh token failed: for example after the tab slept
+ * (back/forward cache, background tab), when the refresh token can be stale although the Keycloak session is still alive.
+ * Only one attempt runs at a time: expiry, a failed renewal and several 401s can arrive together and share it.
+ * Resolves true when signed in again; on failure (login_required, timeout) the user is removed and the login screen shows.
+ */
+export function recoverSession(): Promise<boolean> {
+  if (redirecting) return Promise.resolve(false) // logging in or out: nothing to recover (after logout the password is asked)
+  recovering ??= (async () => {
+    const um = userManager()
+    try {
+      setState(fromUser(await um.signinSilent({ forceIframeAuth: true })))
+      return state.status === 'authenticated'
+    } catch {
+      await um.removeUser()
+      setState(anonymous)
+      return false
+    } finally {
+      recovering = null
+    }
+  })()
+  return recovering
+}
+
 /** Ends the Keycloak session too, then comes back to the app (logged out). */
 export function logout() {
   redirecting = true
@@ -60,8 +86,10 @@ export async function initAuth() {
   const um = userManager()
   um.events.addUserLoaded((user) => setState(fromUser(user)))
   um.events.addUserUnloaded(() => setState(anonymous))
-  um.events.addAccessTokenExpired(() => setState(anonymous))
-  configureSession({ accessToken: () => state.accessToken, onUnauthorized: login })
+  // The login screen is shown only when the silent recovery fails, not as soon as the token expires.
+  um.events.addAccessTokenExpired(() => void recoverSession())
+  um.events.addSilentRenewError(() => void recoverSession())
+  configureSession({ accessToken: () => state.accessToken, recover: recoverSession, onUnauthorized: login })
 
   const params = new URLSearchParams(window.location.search)
   if (params.has('state') && (params.has('code') || params.has('error'))) {

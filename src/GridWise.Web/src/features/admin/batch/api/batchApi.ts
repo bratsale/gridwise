@@ -1,4 +1,4 @@
-import { currentAccessToken, reportUnauthorized } from '../../../../shared/auth/session.ts'
+import { sendWithToken } from '../../../../shared/auth/session.ts'
 import type { components } from '../../../../shared/api/batch.ts'
 import { safeRequest, type ApiResponse } from '../../../../shared/api/client.ts'
 
@@ -70,17 +70,15 @@ export const errorsCsvUrl = (id: string) => `/api/batch/jobs/${id}/errors.csv`
 
 /**
  * Downloads a CSV with the user's token (a plain link cannot send it) and saves it under the given name.
- * Returns false when the download failed; a 401 starts a login like any other request.
+ * Returns false when the download failed; a 401 is handled like any other request (silent renewal, then login).
  */
 export async function downloadCsv(url: string, fileName: string): Promise<boolean> {
-  const token = currentAccessToken()
   let response: Response
   try {
-    response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    response = await sendWithToken((token) => fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} }))
   } catch {
     return false
   }
-  if (response.status === 401) reportUnauthorized()
   if (!response.ok) return false
 
   const href = URL.createObjectURL(await response.blob())
