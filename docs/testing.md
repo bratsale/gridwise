@@ -13,7 +13,7 @@ of these runs overlapped with other work, so treat the durations as upper bounds
 | Layer | Where | Count | How to run | Duration | In CI |
 |---|---|---|---|---|---|
 | Unit (.NET) | `tests/GridWise.Pricing.Tests`, `*.Catalog.Tests`, `*.Recommendation.Tests`, `*.Batch.Tests` | 66 | `dotnet test GridWise.slnx` | a few seconds | yes, job `backend` |
-| Unit (web) | `src/GridWise.Web/src/**/*.test.ts(x)` (Vitest, jsdom) | 127 | `npm test` in `src/GridWise.Web` | about 7 s | yes, job `web` |
+| Unit (web) | `src/GridWise.Web/src/**/*.test.ts(x)` (Vitest, jsdom) | 140 | `npm test` in `src/GridWise.Web` | about 7 s | yes, job `web` |
 | Integration | `tests/GridWise.{Catalog,Recommendation,Batch,Gateway}.IntegrationTests` | 232 | `dotnet test GridWise.slnx` (needs Docker) | 16 s to 2 min 48 s per project, about 6.5 min in total | yes, job `backend` |
 | End-to-end | `tests/e2e` (Playwright, Chromium) | 5 | `npm test` in `tests/e2e`, against a running stack | about 30 s plus starting the stack | yes, job `e2e` (on `main` only) |
 | Load | `scripts/perf/run.sh` (k6), `scripts/perf/batch-throughput.sh` | 3 scenarios, 1 throughput run | see [perf/README.md](perf/README.md) | 70 s per k6 scenario, about 8 min for the batch run | no |
