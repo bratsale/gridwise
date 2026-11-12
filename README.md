@@ -217,6 +217,17 @@ with correlation ids and OpenTelemetry). The batch measurements also show that a
 no longer the bottleneck. A sensible path would have been to start as a modular monolith with the same module boundaries and the
 outbox, and split out the batch workers and recommendation when their load requires it.
 
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Login returns 403 or 502 again and again, although every container is healthy (seen once, on an Apple M3 Max; a Docker restart fixed it) | Restart Docker (Docker Desktop: Quit and start again), then `docker compose up -d --wait` |
+| 502 right after start or after recreating Keycloak | Wait until `docker compose ps` shows keycloak and gateway as healthy (Keycloak needs about a minute) |
+| Login fails when the app is opened through an IP address or another host name | Open it as `http://localhost:5100`; Keycloak is configured for that address |
+| A container cannot start because a port is in use | Free the port (5100–5104, 3000, 5432–5434, 9094), e.g. stop a local PostgreSQL |
+| Services restart or are very slow | Give Docker more memory (6–8 GB) |
+| Anything else odd after many runs | Start clean: `docker compose down -v`, then `docker compose up -d --build --wait` |
+
 ## Repository layout
 
 | Path | Contents |
