@@ -33,7 +33,9 @@ services:
     environment:
       <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw}
+      # Gss Encryption Mode=Disable: Npgsql would otherwise try Kerberos (GSSAPI) encryption first, which the Alpine images do not have
+      # ("Error loading shared library libgssapi_krb5.so.2" at startup); the databases use passwords (SCRAM), not Kerberos.
+      ConnectionStrings__Catalog: Host=catalog-db;Port=5432;Database=catalog;Username=catalog;Password=${CATALOG_DB_PASSWORD:-catalog_dev_pw};Gss Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:9092
       # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
       Kafka__Username: catalog
@@ -82,7 +84,7 @@ services:
     environment:
       <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
+      ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw};Gss Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:9092
       # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
       Kafka__Username: recommendation
@@ -115,7 +117,7 @@ services:
       dockerfile: src/GridWise.Recommendation/Dockerfile
     command: ["worker"]
     environment:
-      ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw}
+      ConnectionStrings__Recommendation: Host=recommendation-db;Port=5432;Database=recommendation;Username=recommendation;Password=${RECOMMENDATION_DB_PASSWORD:-recommendation_dev_pw};Gss Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:9092
       # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
       Kafka__Username: recommendation
@@ -158,7 +160,7 @@ services:
     environment:
       <<: *jwt
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw}
+      ConnectionStrings__Batch: Host=batch-db;Port=5432;Database=batch;Username=batch;Password=${BATCH_DB_PASSWORD:-batch_dev_pw};Gss Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:9092
       # Its own Kafka user (SASL/SCRAM); without these settings the client would connect without logging in.
       Kafka__Username: batch
