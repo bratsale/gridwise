@@ -4,6 +4,13 @@ Sequence diagrams of the main flows. Each flow is split so that every diagram st
 Participants are the containers from the [architecture overview](README.md); "Publisher" and "Consumer" are background
 services inside the Catalog, Recommendation and Batch applications. Table names are in [data-model.md](data-model.md).
 
+Every API call goes from the browser through web (nginx) to the gateway (YARP) and only then to a service
+([ADR 0012](../decisions/0012-identity-and-gateway.md)). The client sends the user's Keycloak access token as `Authorization: Bearer`.
+The gateway answers 401 without a valid token and 429 (with `Retry-After`) when the user's rate limit is used up: fixed windows per
+user (the token's `sub`), 20 calculations per 10 s, 5 uploads per 60 s, 100 other calls per 10 s. It forwards the token unchanged and
+the service checks it again and decides by role (403 when the role does not allow the call). In the diagrams the service's answers
+go straight to web; they pass back through the gateway unchanged.
+
 ## 1. Getting a recommendation
 
 ### 1a. Calculating (synchronous)
@@ -15,11 +22,17 @@ The result and its event are saved in one transaction.
 sequenceDiagram
     actor C as Customer
     participant W as web (nginx + React)
+    participant G as gateway
     participant R as recommendation
     participant DB as recommendation-db
 
     C->>W: Enter kWh and tax group
-    W->>R: POST /api/recommendation/recommendations
+    W->>G: POST /api/recommendation/recommendations, Bearer token
+    alt No valid token, or more than 20 calculations by this user in 10 s
+        G-->>W: 401, or 429 with Retry-After
+    end
+    G->>R: POST /recommendations, same token
+    Note over R: Role customer or admin? created_by = the token's sub
     R->>DB: Latest tax group version valid today
     R->>DB: Per plan, the latest version valid today (DISTINCT ON plan_id)
     DB-->>R: Versions
@@ -29,7 +42,9 @@ sequenceDiagram
     R->>DB: INSERT outbox_messages (RecommendationCalculated), COMMIT
     R-->>W: 201 Created, recommended plan and all plans (breakdown, versions used)
     W-->>C: Recommended plan and comparison
-    alt Unknown or retired tax group, or more than 3 decimals
+    alt Role is neither customer nor admin
+        R-->>W: 403
+    else Unknown or retired tax group, or more than 3 decimals
         R-->>W: 400 validation problem
     else The read model has no active plan yet
         R-->>W: 503 no plans available yet
@@ -62,13 +77,20 @@ again later (delivery is at least once).
 sequenceDiagram
     actor C as Customer
     participant W as web (nginx + React)
+    participant G as gateway
     participant R as recommendation
     participant DB as recommendation-db
 
     C->>W: Accept a plan
-    W->>R: POST /api/recommendation/recommendations/{id}/accept (planId)
+    W->>G: POST /api/recommendation/recommendations/{id}/accept (planId), Bearer token
+    alt No valid token, or rate limit used up
+        G-->>W: 401, or 429 with Retry-After
+    end
+    G->>R: POST /recommendations/{id}/accept, same token
     R->>DB: Read the recommendation and its acceptance
-    alt Recommendation not found
+    alt Role is neither customer nor admin
+        R-->>W: 403
+    else Not found, or calculated by another user (created_by is not the token's sub)
         R-->>W: 404
     else Plan is not in the recommendation
         R-->>W: 400 validation problem
@@ -94,14 +116,23 @@ The `PlanAccepted` event is sent by the same publisher as in 1b.
 sequenceDiagram
     actor A as Administrator
     participant W as web (nginx + React)
+    participant G as gateway
     participant CAT as catalog
     participant DB as catalog-db
 
     A->>W: Edit the plan
-    W->>CAT: GET /api/catalog/plans/{id}
+    W->>G: GET /api/catalog/plans/{id}, Bearer token
+    G->>CAT: GET /plans/{id}
     CAT-->>W: Plan, ETag "3"
     A->>W: Save
-    W->>CAT: POST /api/catalog/plans/{id}/versions, If-Match "3"
+    W->>G: POST /api/catalog/plans/{id}/versions, If-Match "3", Bearer token
+    alt No valid token, or more than 100 calls by this user in 10 s
+        G-->>W: 401, or 429 with Retry-After
+    end
+    G->>CAT: POST /plans/{id}/versions, same token
+    alt Role is not admin
+        CAT-->>W: 403
+    end
     CAT->>DB: Read the latest version of the plan
     alt Plan is retired, or the latest version is not 3
         CAT-->>W: 409 Conflict
@@ -109,12 +140,14 @@ sequenceDiagram
         CAT-->>W: 400 validation problem
     else Version 3 is the latest
         CAT->>DB: BEGIN
-        CAT->>DB: INSERT plan_versions (4), plan_tiers, outbox_messages (PlanVersionCreated)
+        CAT->>DB: INSERT plan_versions (4, changed_by = the token's sub), plan_tiers, outbox_messages (PlanVersionCreated with changedBy)
         CAT->>DB: COMMIT
         CAT-->>W: 201 Created, version 4
     end
     Note over CAT,DB: If two requests pass the check together, the second INSERT fails on the primary key (plan_id, version_no) and also answers 409.
 ```
+
+Reading plans needs only a signed-in user; every change (create, new version, retire) needs the `admin` role.
 
 ### 2b. Reaching the read model (asynchronous)
 
@@ -168,6 +201,17 @@ sequenceDiagram
 A message that fails for another reason is tried 3 times before it goes to the dead-letter topic.
 A message of an unknown event type is skipped and its offset is committed.
 
+Two Grafana alerts cover these cases ([operations](../operations.md)): **Outbox stuck** fires when the oldest unpublished outbox row of
+a service is older than 60 s for 2 minutes (usually Kafka is down or unreachable), and **Dead letters** fires as soon as a message
+has gone to a dead-letter topic in the last 5 minutes.
+
+If the copy in recommendation-db is wrong or incomplete while the topics are fine, it can be rebuilt from Kafka alone:
+[`scripts/replay-recommendation-db.sh`](../../scripts/replay-recommendation-db.sh) stops recommendation and the workers, empties
+`plan_versions` and `tax_group_versions`, resets the offsets of the group `recommendation` on `catalog.plan-events` and
+`catalog.tax-group-events` to the earliest, starts the service and waits until the copy matches catalog-db. This works because both
+topics keep every event; recommendations are unavailable for those few seconds
+([operations](../operations.md#rebuilding-recommendations-catalog-copy-from-kafka)).
+
 ## 3. Batch job
 
 The administrator uploads a CSV of customers (for example 100,000 rows). The answer comes at once, the work happens in the background,
@@ -182,6 +226,7 @@ are Dispatched (not yet Completed) at once.
 sequenceDiagram
     actor A as Administrator
     participant W as web (nginx + React)
+    participant G as gateway
     participant B as batch
     participant DB as batch-db
     participant D as Dispatcher
@@ -189,9 +234,16 @@ sequenceDiagram
     participant K as Kafka
 
     A->>W: Choose a CSV file
-    W->>B: POST /api/batch/jobs (multipart)
+    W->>G: POST /api/batch/jobs (multipart), Bearer token
+    alt No valid token, or more than 5 uploads by this user in 60 s
+        G-->>W: 401, or 429 with Retry-After
+    end
+    G->>B: POST /jobs, same token
+    alt Role is not admin
+        B-->>W: 403
+    end
     Note over B: Checks the header, 1 to 100,000 rows,<br/>lines of at most 200 characters, 10 MB.<br/>Row contents are not validated here
-    B->>DB: BEGIN, INSERT jobs (Pending) and job_files, COMMIT
+    B->>DB: BEGIN, INSERT jobs (Pending, created_by = the token's sub) and job_files, COMMIT
     B-->>W: 202 Accepted, Location /jobs/{id}
     loop every second
         D->>DB: Pending jobs?
