@@ -111,8 +111,11 @@ plans and tax groups come back at the next start). Keycloak has no volume: every
 |---|---|---|---|
 | .NET unit + integration | `dotnet test GridWise.slnx` | .NET 10 SDK, Docker (Testcontainers start PostgreSQL and Kafka) | about 6.5 min (unit tests alone: seconds) |
 | Web unit (Vitest) | `cd src/GridWise.Web && npm ci && npm test` | Node 22 | about 7 s |
-| End-to-end (Playwright) | `cd tests/e2e && npm ci && npx playwright install --with-deps chromium && npm test` | Node 22, the stack running | about 30 s |
+| End-to-end (Playwright) | `cd tests/e2e && npm ci && npx playwright install chromium && npm test` | Node 22, the stack running | about 30 s |
 | Load (k6) | `bash scripts/perf/run.sh` | Docker, the stack running | 70 s of load, plus seeding the first time |
+
+If Chromium fails to start because of missing system libraries, run `npx playwright install --with-deps chromium`
+(Debian/Ubuntu only; on other Linux distributions install the libraries with the package manager).
 
 Counts, what each layer covers, which test guards which risk, and what CI runs: [docs/testing.md](docs/testing.md). On distributions
 where Playwright's browser does not run, use a system Chromium: `E2E_CHROMIUM_PATH=/usr/bin/chromium npm test`
@@ -219,14 +222,15 @@ outbox, and split out the batch workers and recommendation when their load requi
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| Login returns 403 or 502 again and again, although every container is healthy (seen once, on an Apple M3 Max; a Docker restart fixed it) | Restart Docker (Docker Desktop: Quit and start again), then `docker compose up -d --wait` |
-| 502 right after start or after recreating Keycloak | Wait until `docker compose ps` shows keycloak and gateway as healthy (Keycloak needs about a minute) |
-| Login fails when the app is opened through an IP address or another host name | Open it as `http://localhost:5100`; Keycloak is configured for that address |
-| A container cannot start because a port is in use | Free the port (5100–5104, 3000, 5432–5434, 9094), e.g. stop a local PostgreSQL |
-| Services restart or are very slow | Give Docker more memory (6–8 GB) |
-| Anything else odd after many runs | Start clean: `docker compose down -v`, then `docker compose up -d --build --wait` |
+| Symptom | Cause | Fix |
+|---|---|---|
+| Login returns 403/502 right after `docker compose up` | Seen once, on an Apple M3 Max; the Docker networking was in a bad state, not the application | Restart Docker, then `docker compose down -v && docker compose up -d --build --wait` |
+| Playwright fails with "Executable doesn't exist" | The browser was not downloaded (for example `--with-deps` failed on a non-Debian system) | `cd tests/e2e && npx playwright install chromium` |
+| 502 right after start or after recreating Keycloak | Keycloak is still starting (it needs about a minute) | Wait until `docker compose ps` shows keycloak and gateway as healthy |
+| Login fails when the app is opened through an IP address or another host name | Keycloak is configured for `http://localhost:5100` only | Open it as `http://localhost:5100` |
+| A container cannot start because a port is in use | Another program uses one of the ports, e.g. a local PostgreSQL | Free the port (5100–5104, 3000, 5432–5434, 9094) |
+| Services restart or are very slow | Docker has too little memory | Give Docker more memory (6–8 GB) |
+| Anything else odd after many runs | Leftover data or containers from earlier runs | Start clean: `docker compose down -v`, then `docker compose up -d --build --wait` |
 
 ## Repository layout
 
